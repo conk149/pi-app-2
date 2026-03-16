@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PI Comparator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- PDF.js (UMD build) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script>
+    (function () {
+      var lib = window['pdfjsLib'] || window['pdfjs-dist'] || window['pdfjs'];
+      if (!lib) {
+        console.error('PDF.js library failed to load – PDF extraction will not work.');
+        return;
+      }
+      window.pdfjsLib = lib;
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      } catch (e) {
+        console.warn('Failed to set PDF.js workerSrc', e);
+      }
+    })();
+  </script>
+
+  <!-- Tesseract.js (OCR fallback) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #f7f3e9;
+      --bg-elevated: #ffffff;
+      --text-color: #243238;
+      --muted-text: #607d8b;
+      --primary: #00897b;
+      --primary-soft: rgba(0, 137, 123, 0.08);
+      --danger: #c62828;
+      --warning: #ff8f00;
+      --border-color: #d7ccc8;
+      --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.06);
+      --accent: #00695c;
+      --badge-ready-bg: #e0f2f1;
+      --badge-ready-text: #00695c;
+      --badge-processing-bg: #fff3e0;
+      --badge-processing-text: #ef6c00;
+      --badge-error-bg: #ffebee;
+      --badge-error-text: #c62828;
+      --file-card-bg: #ffffff;
+      --table-header-bg: #eceff1;
+      --table-row-alt: #fafafa;
+      --highlight-unique: #fff8e1;
+      --scrollbar-thumb: #b0bec5;
+      --scrollbar-track: #eceff1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg-color);
+      color: var(--text-color);
+    }
+
+    body {
+      padding: 16px 24px 32px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted-text);
+      font-size: 13px;
+    }
+
+    .app-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--text-color);
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: var(--shadow-soft);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--muted-text);
+    }
+
+    .upload-section {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+      align-items: flex-start;
+    }
+
+    @media (max-width: 900px) {
+      .upload-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dropzone {
+      border: 1px dashed var(--border-color);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 16px 14px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      box-shadow: var(--shadow-soft);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .dropzone-desc {
+      font-size: 12px;
+      color: var(--muted-text);
+      margin-bottom: 10px;
+    }
+
+    .counter-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted-text);
+    }
+
+    .counter-pill {
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      font-weight: 600;
+    }
+
+    .counter-pill.ready {
+      color: #1b5e20;
+      background: #e8f5e9;
+      border-color: #a5d6a7;
+    }
+
+    .hint-text {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted-text);
+    }
+
+    .files-panel {
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-soft);
+      min-height: 88px;
+      border: 1px solid var(--border-color);
+    }
+
+    .files-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .files-header-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .files-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .empty-state {
+      font-size: 12px;
+      color: var(--muted-text);
+      padding: 8px 0 4px;
+    }
+
+    .file-card {
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--file-card-bg);
+      padding: 8px 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .file-main {
+      min-width: 0;
+    }
+
+    .file-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      justify-content: space-between;
+    }
+
+    .file-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-meta {
+      font-size: 11px;
+      color: var(--muted-text);
+    }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-processing {
+      background: var(--badge-processing-bg);
+      color: var(--badge-processing-text);
+    }
+
+    .status-ready {
+      background: var(--badge-ready-bg);
+      color: var(--badge-ready-text);
+    }
+
+    .status-error {
+      background: var(--badge-error-bg);
+      color: var(--badge-error-text);
+    }
+
+    .status-ocr {
+      background: rgba(25, 118, 210, 0.1);
+      color: #1565c0;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .spinner {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.06);
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--primary), #4dd0e1);
+      width: 0;
+      transition: width 0.15s ease;
+    }
+
+    .file-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    details.debug {
+      margin-top: 4px;
+      font-size: 11px;
+    }
+
+    details.debug summary {
+      cursor: pointer;
+      color: var(--muted-text);
+      list-style: none;
+    }
+
+    .debug-text {
+      margin-top: 4px;
+      max-height: 160px;
+      overflow: auto;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.02);
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+    }
+
+    .ocr-note {
+      font-size: 10px;
+      color: var(--muted-text);
+      margin-top: 2px;
+    }
+
+    .compare-section {
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 12px 14px 16px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-color);
+    }
+
+    .compare-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .compare-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .compare-subtitle {
+      font-size: 11px;
+      color: var(--muted-text);
+    }
+
+    .table-container {
+      max-height: calc(100vh - 260px);
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--table-header-bg);
+    }
+
+    thead th {
+      padding: 8px 8px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+      font-weight: 600;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: var(--table-row-alt);
+    }
+
+    tbody td {
+      border-bottom: 1px solid var(--border-color);
+      padding: 6px 8px;
+      vertical-align: top;
+      max-width: 400px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .section-col {
+      width: 160px;
+    }
+
+    .key-diff-identical {
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    .key-diff-similar {
+      color: #f9a825;
+      font-weight: 600;
+    }
+
+    .key-diff-different {
+      color: #c62828;
+      font-weight: 600;
+    }
+
+    .key-diff-missing {
+      color: #6a1b9a;
+      font-weight: 600;
+    }
+
+    .cell-unique {
+      background: var(--highlight-unique);
+    }
+
+    .not-specified {
+      font-style: italic;
+      color: var(--muted-text);
+    }
+
+    .scrollbar::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .scrollbar::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    .scrollbar::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <header>
+      <div class="top-bar">
+        <div>
+          <h1>PI Comparator</h1>
+          <p class="subtitle">
+            Upload 2–3 package inserts (PDF/TXT), extract key sections locally, and compare side by side.
+          </p>
+        </div>
+        <div class="top-actions">
+          <span class="pill" id="readySummary">0 files uploaded</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="upload-section">
+        <div>
+          <div class="dropzone" id="dropzone" tabindex="0" aria-label="Upload 2 to 3 PDF or text files">
+            <input id="fileInput" type="file" accept=".pdf,.txt" multiple />
+            <div class="dropzone-title">Drop PDFs or TXT files here</div>
+            <div class="dropzone-desc">
+              or click to browse. Accepts 2–3 files, up to 20 MB total.
+            </div>
+            <div class="counter-row">
+              <span>Total size limit 20 MB</span>
+              <span class="counter-pill" id="fileCountPill">0 files uploaded</span>
+            </div>
+            <div class="hint-text">
+              Digital PIs compare best. Scanned leaflets can use optional English-only OCR (slower, always verify in original PI).
+            </div>
+          </div>
+        </div>
+
+        <div class="files-panel">
+          <div class="files-header">
+            <div>
+              <div class="files-header-title">Uploaded files</div>
+              <div class="compare-subtitle" id="compareHint">
+                Add at least 2 files to start comparison.
+              </div>
+            </div>
+            <button type="button" class="danger" id="clearAllBtn">Clear all files</button>
+          </div>
+          <div class="files-list" id="filesList"></div>
+          <div class="empty-state" id="emptyState">
+            Drag and drop 2–3 package inserts (PDF or TXT).<br />
+            Digital PDFs with a text layer are parsed automatically.<br />
+            Scanned PDFs are detected and can optionally run slow English OCR per file.
+          </div>
+        </div>
+      </section>
+
+      <section class="compare-section">
+        <div class="compare-header">
+          <div>
+            <div class="compare-title">Clinical section comparison</div>
+            <div class="compare-subtitle" id="compareStatusLabel">
+              Waiting for at least 2 Ready products.
+            </div>
+          </div>
+          <div class="top-actions">
+            <button type="button" id="aiAssistBtn" disabled>AI assist comparison</button>
+            <button type="button" id="exportJsonBtn" disabled>Export JSON for AI</button>
+            <button type="button" class="primary" id="exportCsvBtn" disabled>Export CSV</button>
+          </div>
+        </div>
+
+        <div class="table-container scrollbar" id="tableContainer">
+          <table id="comparisonTable" aria-label="Package insert comparison table">
+            <thead>
+              <tr id="tableHeaderRow">
+                <th class="section-col">Section</th>
+                <th>Product 1</th>
+                <th>Product 2</th>
+                <th id="thirdProductHeader" style="display: none;">Product 3</th>
+                <th>Key Differences</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center; padding:16px; font-size:12px; color:var(--muted-text);">
+                  Comparison table will appear once at least 2 products are Ready.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- AI assist panel -->
+      <section class="compare-section" id="aiAssistPanel" style="margin-top: 12px; display:none;">
+        <div class="compare-header">
+          <div>
+            <div class="compare-title">AI-assisted clinical notes (placeholder)</div>
+            <div class="compare-subtitle" id="aiAssistStatus">
+              Click “AI assist comparison” to see how AI will interpret this comparison in the future.
+            </div>
+          </div>
+        </div>
+        <div id="aiNotesBody" style="font-size:12px; color:var(--text-color); white-space:pre-wrap;"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ---------- State ----------
+    let uploadedFiles = [];
+    let parsedDocuments = {};
+    let comparisonData = [];
+    const processingStatus = {};
+    const progressValues = {};
+
+    const NOT_SPECIFIED = 'Not specified in uploaded document';
+
+    const sectionConfigs = [
+      { key: 'indications', name: 'Indications', headerPatterns: [/indications?/i, /therapeutic indications?/i], synonyms: ['indication', 'indications', 'uses', 'usage'] },
+      { key: 'dilutionMethod', name: 'Dilution Method', headerPatterns: [/method of reconstitution/i, /reconstitution/i, /dilution/i, /preparation of the solution/i], synonyms: ['dilution', 'reconstitution', 'preparation'] },
+      { key: 'compatibleDiluents', name: 'Compatible Diluents', headerPatterns: [/compatible diluents?/i, /diluents? compatible/i], synonyms: ['diluent', 'diluents', 'solvent', 'solvents'] },
+      { key: 'administration', name: 'Administration', headerPatterns: [/method of administration/i, /administration/i, /posology and method of administration/i], synonyms: ['administration', 'administer', 'infusion', 'injection', 'posology'] },
+      { key: 'contraindications', name: 'Contraindications', headerPatterns: [/contraindications?/i], synonyms: ['contraindication', 'not to be used', 'must not be used'] },
+      { key: 'cautionsWarnings', name: 'Warnings / Precautions', headerPatterns: [/warnings? and precautions?/i, /special warnings and precautions for use/i], synonyms: ['warning', 'warnings', 'precaution', 'precautions'] },
+      { key: 'ageLimitsDosage', name: 'Dosage / Age Limits', headerPatterns: [/posology/i, /dosage and administration/i, /dose and administration/i, /paediatric population/i, /geriatric population/i], synonyms: ['dosage', 'dose', 'posology', 'age limits', 'pediatric', 'paediatric', 'elderly'] },
+      { key: 'drugInteractions', name: 'Drug Interactions', headerPatterns: [/drug interactions?/i, /interaction with other medicinal products/i], synonyms: ['interaction', 'drug interaction'] },
+      { key: 'sideEffects', name: 'Side Effects', headerPatterns: [/adverse reactions?/i, /undesirable effects?/i, /side effects?/i], synonyms: ['adverse reaction', 'adverse event', 'side effect'] },
+      { key: 'storage', name: 'Storage Conditions', headerPatterns: [/storage/i, /special precautions for storage/i], synonyms: ['store', 'storage'] },
+      { key: 'shelfLife', name: 'Shelf Life', headerPatterns: [/shelf life/i], synonyms: ['expiry', 'expiration'] },
+      { key: 'reconstitutionStability', name: 'Reconstitution / Infusion Stability', headerPatterns: [/stability/i, /shelf life after reconstitution/i], synonyms: ['stability', 'reconstituted solution'] },
+      { key: 'containerStrength', name: 'Container / Strength / Pack', headerPatterns: [/pharmaceutical form/i, /presentation/i, /pack size/i], synonyms: ['vial', 'ampoule', 'strength', 'pack'] },
+      { key: 'additionalNotes', name: 'Additional Notes', headerPatterns: [/special precautions for disposal/i, /other information/i], synonyms: ['note', 'miscellaneous'] }
+    ];
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      const val = bytes / Math.pow(1024, i);
+      return `${val.toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+    }
+
+    function generateId() {
+      return 'f_' + Math.random().toString(36).slice(2, 9);
+    }
+
+    function getReadyFiles() {
+      return uploadedFiles.filter(f => f.status === 'Ready');
+    }
+
+    function updateFileCountDisplay() {
+      const countPill = document.getElementById('fileCountPill');
+      const readySummary = document.getElementById('readySummary');
+      const total = uploadedFiles.length;
+      countPill.textContent = `${total} files uploaded`;
+      readySummary.textContent = `${total} files uploaded`;
+
+      const readyCount = getReadyFiles().length;
+      if (readyCount >= 2) {
+        countPill.classList.add('ready');
+      } else {
+        countPill.classList.remove('ready');
+      }
+
+      const hint = document.getElementById('compareHint');
+      if (readyCount >= 2) {
+        hint.textContent = 'At least 2 products are Ready. Comparison below is updated automatically.';
+      } else {
+        hint.textContent = 'Add at least 2 files to start comparison.';
+      }
+    }
+
+    // ---------- File add / remove / clear ----------
+    function addFiles(fileList) {
+      const incoming = Array.from(fileList || []);
+      if (!incoming.length) return;
+
+      if (uploadedFiles.length >= 3) {
+        alert('A maximum of 3 files is allowed. Remove a file before adding another.');
+        return;
+      }
+
+      const existingSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+      const incomingSize = incoming.reduce((sum, f) => sum + (f.size || 0), 0);
+      const totalSize = existingSize + incomingSize;
+      if (totalSize > 20 * 1024 * 1024) {
+        alert('Total upload size cannot exceed 20 MB.');
+        return;
+      }
+
+      const availableSlots = 3 - uploadedFiles.length;
+      const filesToAdd = incoming.slice(0, availableSlots);
+
+      filesToAdd.forEach(file => {
+        const id = generateId();
+        const fileObj = {
+          id,
+          file,
+          name: file.name,
+          size: file.size,
+          status: 'Processing',
+          processingMode: 'text',
+          error: null,
+          progress: 0,
+          extractedText: ''
+        };
+        uploadedFiles.push(fileObj);
+        processingStatus[id] = 'Processing';
+        progressValues[id] = 0;
+        processFile(fileObj);
+      });
+
+      renderFileCards();
+      updateFileCountDisplay();
+    }
+
+    function removeFile(fileId) {
+      uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+      delete parsedDocuments[fileId];
+      delete processingStatus[fileId];
+      delete progressValues[fileId];
+
+      if (uploadedFiles.length === 0) {
+        comparisonData = [];
+      } else {
+        compareSections(parsedDocuments);
+      }
+
+      renderFileCards();
+      renderComparisonTable();
+      updateFileCountDisplay();
+    }
+
+    function clearAllFiles() {
+      const ok = confirm('Clear all uploaded files and reset comparison?');
+      if (!ok) return;
+
+      uploadedFiles = [];
+      parsedDocuments = {};
+      comparisonData = [];
+      for (const key in processingStatus) delete processingStatus[key];
+      for (const key in progressValues) delete progressValues[key];
+
+      renderFileCards();
+      renderComparisonTable();
+      updateFileCountDisplay();
+
+      const panel = document.getElementById('aiAssistPanel');
+      panel.style.display = 'none';
+    }
+
+    // ---------- OCR English filter ----------
+    function filterToEnglishLines(text) {
+      if (!text) return '';
+      const lines = text.split(/\r?\n/);
+      const keep = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const latin = trimmed.match(/[A-Za-z]/g) || [];
+        const nonAscii = trimmed.match(/[^\x00-\x7F]/g) || [];
+        const total = latin.length + nonAscii.length;
+        if (total === 0) continue;
+        if (latin.length >= 8 && latin.length / total >= 0.7) {
+          keep.push(trimmed);
+        }
+      }
+      return keep.join('\n');
+    }
+
+    // ---------- Text extraction ----------
+    function extractTextFromTxt(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read text file.'));
+        reader.onload = () => resolve(reader.result);
+        reader.readAsText(file);
+      });
+    }
+
+    async function extractTextFromPdf(file, onProgress) {
+      if (!window.pdfjsLib) {
+        throw new Error('PDF.js not available in this browser.');
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+      const pdf = await loadingTask.promise;
+      const maxPages = Math.min(pdf.numPages, 10);
+      let combinedText = '';
+
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str || '');
+        combinedText += strings.join(' ') + '\n';
+        const progress = 10 + (pageNum / maxPages) * 60;
+        onProgress(progress);
+      }
+      return combinedText;
+    }
+
+    async function performOcrFallback(file, onProgress) {
+      if (!window.Tesseract) {
+        throw new Error('OCR not available – Tesseract.js missing.');
+      }
+      if (!window.pdfjsLib) {
+        throw new Error('PDF.js not available for OCR fallback.');
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+      const pdf = await loadingTask.promise;
+      const totalPages = Math.min(pdf.numPages, 5);
+      let extracted = '';
+
+      const worker = await Tesseract.createWorker({
+        logger: m => {
+          if (m.status === 'recognizing text' && m.progress != null) {
+            const globalProgress = 40 + (m.progress * 60);
+            onProgress(Math.min(100, Math.round(globalProgress)));
+          }
+        }
+      });
+
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+      await worker.setParameters({
+        tessedit_char_whitelist:
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-:;%()/+ '
+      });
+
+      try {
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: context, viewport }).promise;
+          const dataUrl = canvas.toDataURL('image/png');
+
+          const result = await worker.recognize(dataUrl);
+          extracted += result.data.text + '\n';
+          const overall = 40 + (pageNum / totalPages) * 60;
+          onProgress(Math.min(100, Math.round(overall)));
+        }
+      } finally {
+        await worker.terminate();
+      }
+
+      return extracted;
+    }
+
+    // ---------- Normalization & parsing ----------
+    function normalizeText(text) {
+      if (!text) return '';
+      let t = text;
+      t = t.replace(/\u00AD/g, '');
+      t = t.replace(/\r\n/g, '\n');
+      t = t.replace(/\s+/g, ' ');
+      t = t.trim();
+      return t;
+    }
+
+    function normalizeClinicalText(text) {
+      if (!text) return '';
+      let t = normalizeText(text).toLowerCase();
+      return t;
+    }
+
+    function canonicalizeFluidName(text) {
+      if (!text) return '';
+      const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
+      const nsPatterns = [
+        /normal saline/,
+        /0\.9\s*%?\s*saline/,
+        /sodium chloride/,
+        /nacl\s*0\.9/
+      ];
+      for (const re of nsPatterns) {
+        if (re.test(t)) return '0.9% sodium chloride for injection';
+      }
+      const wfiPatterns = [/water for injection/, /sterile water/];
+      for (const re of wfiPatterns) {
+        if (re.test(t)) return 'water for injection';
+      }
+      const d5Patterns = [/d5w?/, /dextrose 5/, /glucose 5/];
+      for (const re of d5Patterns) {
+        if (re.test(t)) return '5% dextrose';
+      }
+      return normalizeText(text).toLowerCase();
+    }
+
+    function extractCompatibleFluids(text) {
+      if (!text) return [];
+      const fluids = [];
+      const genericCandidates = [
+        '0.9% saline',
+        'normal saline',
+        'sodium chloride',
+        'nacl',
+        'wfi',
+        'water for injection',
+        'd5',
+        'd5w',
+        'dextrose 5',
+        'glucose 5'
+      ];
+      const lower = text.toLowerCase();
+      genericCandidates.forEach(term => {
+        const re = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        if (re.test(lower)) fluids.push(term);
+      });
+      const unique = Array.from(new Set(fluids.map(canonicalizeFluidName)));
+      return unique;
+    }
+
+    function findSectionMatches(text, sectionConfig) {
+      const blocks = [];
+      const normalizedText = text;
+      const headerRegexes = sectionConfig.headerPatterns || [];
+      const indices = [];
+
+      headerRegexes.forEach(re => {
+        let match;
+        const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+        while ((match = globalRe.exec(normalizedText)) !== null) {
+          indices.push({ index: match.index, length: match[0].length });
+        }
+      });
+
+      if (!indices.length) return blocks;
+      indices.sort((a, b) => a.index - b.index);
+
+      for (let i = 0; i < indices.length; i++) {
+        const start = indices[i].index + indices[i].length;
+        const end = i + 1 < indices.length ? indices[i + 1].index : normalizedText.length;
+        const segment = normalizedText.slice(start, end).trim();
+        if (segment) blocks.push(segment);
+      }
+
+      return blocks;
+    }
+
+    function parseSections(text) {
+      const rawSections = {};
+      const normalizedSections = {};
+      const cleanText = text;
+
+      sectionConfigs.forEach(section => {
+        let rawValue = '';
+        if (section.key === 'compatibleDiluents') {
+          const fluids = extractCompatibleFluids(cleanText);
+          rawValue = fluids.length ? fluids.join(', ') : '';
+        } else {
+          const matches = findSectionMatches(cleanText, section);
+          rawValue = matches && matches.length ? matches[0].slice(0, 600) : '';
+        }
+
+        if (!rawValue) {
+          rawSections[section.key] = NOT_SPECIFIED;
+          normalizedSections[section.key] = NOT_SPECIFIED;
+        } else {
+          if (section.key === 'compatibleDiluents') {
+            const fluids = extractCompatibleFluids(cleanText);
+            const canonicalList = Array.from(new Set(fluids.map(canonicalizeFluidName)));
+            const str = canonicalList.join(', ');
+            rawSections[section.key] = str || NOT_SPECIFIED;
+            normalizedSections[section.key] = str || NOT_SPECIFIED;
+          } else {
+            rawSections[section.key] = rawValue;
+            const normalized = normalizeClinicalText(rawValue.slice(0, 600));
+            normalizedSections[section.key] = normalized || NOT_SPECIFIED;
+          }
+        }
+      });
+
+      return { rawSections, normalizedSections };
+    }
+
+    // ---------- Comparison ----------
+    function compareNormalizedLists(values) {
+      const filtered = values.filter(v => v && v !== NOT_SPECIFIED);
+      if (!filtered.length) {
+        return { status: 'Missing', identical: true, similar: false };
+      }
+
+      const sets = filtered.map(v =>
+        Array.from(
+          new Set(
+            v
+              .split(',')
+              .map(x => canonicalizeFluidName(x.trim()))
+              .filter(Boolean)
+          )
+        ).sort()
+      );
+
+      const allMissing = values.every(v => !v || v === NOT_SPECIFIED);
+      if (allMissing) return { status: 'Missing', identical: true, similar: false };
+
+      const first = sets[0].join(',');
+      const identical = sets.every(s => s.join(',') === first);
+      if (identical) {
+        return { status: allMissing ? 'Missing' : 'Identical', identical: true, similar: false };
+      }
+
+      const base = sets[0];
+      const cores = sets.map(s => s.filter(x => base.includes(x)));
+      const overlaps = cores.every(c => c.length > 0);
+      const extras = sets.some(s => s.some(x => !base.includes(x)));
+      if (overlaps && extras) {
+        return { status: 'Similar', identical: false, similar: true };
+      }
+
+      return { status: allMissing ? 'Missing' : 'Different', identical: false, similar: false };
+    }
+
+    function classifyDifference(values, sectionKey) {
+      const normalizedValues = values.map(v => {
+        if (!v) return '';
+        if (v === NOT_SPECIFIED) return NOT_SPECIFIED;
+        return normalizeClinicalText(v);
+      });
+
+      const allMissing = normalizedValues.every(v => v === NOT_SPECIFIED || !v);
+      if (allMissing) return 'Missing';
+
+      // SPECIAL CASE: contraindications "hypersensitivity only" → treat as identical
+      if (sectionKey === 'contraindications') {
+        const cleaned = normalizedValues.map(v => {
+          if (!v || v === NOT_SPECIFIED) return '';
+          return v
+            .replace(/patients?/g, '')
+            .replace(/known/g, '')
+            .replace(/history of/g, '')
+            .replace(/to this medicinal product/g, '')
+            .replace(/to the active substance.*$/g, '')
+            .replace(/to any of the excipients.*$/g, '')
+            .trim();
+        });
+
+        const onlyHypersensitivity = cleaned.every(v =>
+          v &&
+          /hypersensitiv|allerg/i.test(v) &&
+          !/severe|acute|chf|shock|respiratory|renal|hepatic|glaucoma|myasthenia|pregnan|breast\-?feeding|coma|depression|obstruction|contraindicated with/i.test(v)
+        );
+
+        if (onlyHypersensitivity) {
+          return 'Identical';
+        }
+      }
+
+      const first = normalizedValues[0];
+      const allEqual = normalizedValues.every(v => v === first);
+      if (allEqual) return 'Identical';
+
+      if (sectionKey === 'compatibleDiluents') {
+        const result = compareNormalizedLists(values);
+        return result.status;
+      }
+
+      const len = normalizedValues.length;
+      let overlapCount = 0;
+      for (let i = 0; i < len; i++) {
+        for (let j = i + 1; j < len; j++) {
+          const a = normalizedValues[i];
+          const b = normalizedValues[j];
+          if (!a || !b || a === NOT_SPECIFIED || b === NOT_SPECIFIED) continue;
+          const short = a.length < b.length ? a : b;
+          const long = a.length < b.length ? b : a;
+          if (short.length < 40) continue;
+          if (long.includes(short.slice(0, Math.floor(short.length * 0.7)))) {
+            overlapCount++;
+          }
+        }
+      }
+
+      if (overlapCount >= 1) return 'Similar';
+      return 'Different';
+    }
+
+    function compareSections(parsedDocs) {
+      const readyFiles = getReadyFiles();
+      if (readyFiles.length < 2) {
+        comparisonData = [];
+        return;
+      }
+      const fileIds = readyFiles.map(f => f.id);
+      const rows = [];
+
+      sectionConfigs.forEach(section => {
+        const values = fileIds.map(id => {
+          const doc = parsedDocs[id];
+          if (!doc) return NOT_SPECIFIED;
+          const v = doc.rawSections[section.key];
+          return v || NOT_SPECIFIED;
+        });
+        const keyDiff = classifyDifference(values, section.key);
+        rows.push({ section: section.name, key: section.key, values, keyDifference: keyDiff });
+      });
+
+      comparisonData = rows;
+    }
+
+    // ---------- CSV ----------
+    function escapeCsvValue(value) {
+      if (value == null) return '""';
+      let v = String(value);
+      v = v.replace(/"/g, '""');
+      return `"${v}"`;
+    }
+
+    function exportComparisonCsv() {
+      if (!comparisonData.length) return;
+      const readyFiles = getReadyFiles();
+      const cols = ['Section'];
+      readyFiles.forEach((f, idx) => {
+        const modeLabel = f.processingMode === 'ocr' ? ' (OCR)' : '';
+        cols.push(`Product ${idx + 1}: ${f.name}${modeLabel}`);
+      });
+      cols.push('Key Differences');
+
+      const lines = [];
+      lines.push(cols.map(escapeCsvValue).join(','));
+
+      comparisonData.forEach(row => {
+        const base = [row.section];
+        base.push(...row.values.slice(0, readyFiles.length));
+        base.push(row.keyDifference);
+        lines.push(base.map(escapeCsvValue).join(','));
+      });
+
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pi_comparison.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- JSON for future AI ----------
+    function buildAiComparisonPayload() {
+      const readyFiles = getReadyFiles();
+      if (readyFiles.length < 2 || !comparisonData.length) return null;
+
+      const products = readyFiles.map(f => {
+        const doc = parsedDocuments[f.id];
+        return {
+          name: f.name,
+          sections: doc ? doc.rawSections : {}
+        };
+      });
+
+      const comparison = comparisonData.map(row => ({
+        section: row.section,
+        key: row.key,
+        status: row.keyDifference
+      }));
+
+      return { products, comparison };
+    }
+
+    function exportComparisonJsonForAi() {
+      const payload = buildAiComparisonPayload();
+      if (!payload) return;
+
+      const blob = new Blob(
+        [JSON.stringify(payload, null, 2)],
+        { type: 'application/json;charset=utf-8;' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pi_comparison_for_ai.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- AI assist placeholder ----------
+    function showAiAssistPlaceholder() {
+      const payload = buildAiComparisonPayload();
+      if (!payload) return;
+
+      const panel = document.getElementById('aiAssistPanel');
+      const statusEl = document.getElementById('aiAssistStatus');
+      const bodyEl = document.getElementById('aiNotesBody');
+
+      panel.style.display = 'block';
+      statusEl.textContent =
+        'Placeholder: In the future, this panel will show AI-generated clinical interpretations based on the JSON payload below.';
+
+      let text = '';
+      text += 'Current AI payload (excerpt):\n';
+      text += '- Products: ' + payload.products.length + '\n';
+      payload.products.forEach((p, idx) => {
+        text += '  • Product ' + (idx + 1) + ': ' + p.name + '\n';
+      });
+      text += '- Sections compared: ' + payload.comparison.length + '\n\n';
+      text += 'Example comparison statuses:\n';
+      payload.comparison.slice(0, 8).forEach(c => {
+        text += '  • ' + c.section + ': ' + c.status + '\n';
+      });
+      text += '\nTo use a backend later, this payload would be POSTed to /api/interpret-comparison and the response (section_notes + overall_summary) rendered here.';
+
+      bodyEl.textContent = text;
+    }
+
+    // ---------- Rendering ----------
+    function renderFileCards() {
+      const list = document.getElementById('filesList');
+      const empty = document.getElementById('emptyState');
+      list.innerHTML = '';
+      if (!uploadedFiles.length) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      uploadedFiles.forEach((fObj, index) => {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+
+        const main = document.createElement('div');
+        main.className = 'file-main';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'file-title-row';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'file-name';
+        nameEl.textContent = fObj.name || `Product ${index + 1}`;
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'file-meta';
+        const modeLabel =
+          fObj.processingMode === 'ocr' ? ' • OCR' :
+          fObj.processingMode === 'text' ? ' • Text' : '';
+        metaEl.textContent = `${formatBytes(fObj.size)} • Product ${index + 1}${modeLabel}`;
+
+        titleRow.appendChild(nameEl);
+
+        const statusBadge = document.createElement('span');
+        statusBadge.className = 'status-badge';
+        const badgeDot = document.createElement('span');
+        badgeDot.className = 'badge-dot';
+        const statusText = document.createElement('span');
+
+        if (fObj.status === 'Processing') {
+          statusBadge.classList.add('status-processing');
+          const spinner = document.createElement('span');
+          spinner.className = 'spinner';
+          statusBadge.appendChild(spinner);
+          statusText.textContent = 'Processing';
+        } else if (fObj.status === 'Ready') {
+          if (fObj.processingMode === 'ocr') {
+            statusBadge.classList.add('status-ocr');
+          } else {
+            statusBadge.classList.add('status-ready');
+          }
+          statusBadge.appendChild(badgeDot);
+          statusText.textContent = fObj.processingMode === 'ocr' ? 'Ready (OCR)' : 'Ready';
+        } else {
+          statusBadge.classList.add('status-error');
+          statusBadge.appendChild(badgeDot);
+          statusText.textContent = 'Error';
+        }
+        statusBadge.appendChild(statusText);
+
+        titleRow.appendChild(statusBadge);
+        main.appendChild(titleRow);
+        main.appendChild(metaEl);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        const fill = document.createElement('div');
+        fill.className = 'progress-fill';
+        fill.style.width = fObj.progress + '%';
+        progressBar.appendChild(fill);
+        main.appendChild(progressBar);
+
+        if (fObj.error && fObj.status === 'Error') {
+          const err = document.createElement('div');
+          err.className = 'file-meta';
+          err.style.color = 'var(--danger)';
+          err.textContent = fObj.error;
+          main.appendChild(err);
+
+          if (/Scanned PDF detected/i.test(fObj.error)) {
+            const note = document.createElement('div');
+            note.className = 'ocr-note';
+            note.textContent = 'Scanned insert – run English-only OCR if needed.';
+            main.appendChild(note);
+          }
+        }
+
+        const details = document.createElement('details');
+        details.className = 'debug';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Show extracted text';
+        const pre = document.createElement('div');
+        pre.className = 'debug-text scrollbar';
+        pre.textContent = fObj.extractedText
+          ? fObj.extractedText.slice(0, 5000)
+          : 'No text extracted yet.';
+        details.appendChild(summary);
+        details.appendChild(pre);
+        main.appendChild(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'file-actions';
+
+        if (fObj.status === 'Error' && /Scanned PDF detected/i.test(fObj.error)) {
+          const ocrBtn = document.createElement('button');
+          ocrBtn.type = 'button';
+          ocrBtn.textContent = 'Run OCR (English, slow)';
+          ocrBtn.addEventListener('click', () => runOcrForFile(fObj.id));
+          actions.appendChild(ocrBtn);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => removeFile(fObj.id));
+        actions.appendChild(removeBtn);
+
+        card.appendChild(main);
+        card.appendChild(actions);
+        list.appendChild(card);
+      });
+
+      const readyFiles = getReadyFiles();
+      const exportBtn = document.getElementById('exportCsvBtn');
+      exportBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      const exportJsonBtn = document.getElementById('exportJsonBtn');
+      if (exportJsonBtn) {
+        exportJsonBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+      const aiAssistBtn = document.getElementById('aiAssistBtn');
+      if (aiAssistBtn) {
+        aiAssistBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+    }
+
+    function renderComparisonTable() {
+      const tbody = document.getElementById('comparisonTableBody');
+      const thirdHeader = document.getElementById('thirdProductHeader');
+      tbody.innerHTML = '';
+      const readyFiles = getReadyFiles();
+      const colCount = readyFiles.length;
+
+      if (colCount < 2 || !comparisonData.length) {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.style.textAlign = 'center';
+        td.style.padding = '16px';
+        td.style.fontSize = '12px';
+        td.style.color = 'var(--muted-text)';
+        td.textContent = 'Comparison table will appear once at least 2 products are Ready.';
+        row.appendChild(td);
+        tbody.appendChild(row);
+        thirdHeader.style.display = 'none';
+        const exportBtn = document.getElementById('exportCsvBtn');
+        exportBtn.disabled = true;
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        if (exportJsonBtn) exportJsonBtn.disabled = true;
+        const aiAssistBtn = document.getElementById('aiAssistBtn');
+        if (aiAssistBtn) aiAssistBtn.disabled = true;
+        return;
+      }
+
+      if (colCount === 3) {
+        thirdHeader.style.display = '';
+        thirdHeader.textContent = 'Product 3';
+      } else {
+        thirdHeader.style.display = 'none';
+      }
+
+      comparisonData.forEach(row => {
+        const tr = document.createElement('tr');
+        const sectionTd = document.createElement('td');
+        sectionTd.className = 'section-col';
+        sectionTd.textContent = row.section;
+        tr.appendChild(sectionTd);
+
+        const valuesToRender = row.values.slice(0, colCount);
+        let base = '';
+        if (row.key === 'compatibleDiluents') {
+          base = valuesToRender[0] || '';
+        } else {
+          base = normalizeClinicalText(valuesToRender[0] || '');
+        }
+
+        valuesToRender.forEach(val => {
+          const td = document.createElement('td');
+          if (!val || val === NOT_SPECIFIED) {
+            td.textContent = NOT_SPECIFIED;
+            td.classList.add('not-specified');
+          } else {
+            td.textContent = val;
+            if (row.keyDifference === 'Different' && val && val !== NOT_SPECIFIED) {
+              if (row.key === 'compatibleDiluents') {
+                const canonBase = canonicalizeFluidName(base);
+                const canonVal = canonicalizeFluidName(val);
+                if (canonVal !== canonBase) {
+                  td.classList.add('cell-unique');
+                }
+              } else {
+                const n = normalizeClinicalText(val);
+                if (n !== base) {
+                  td.classList.add('cell-unique');
+                }
+              }
+            }
+          }
+          tr.appendChild(td);
+        });
+
+        if (colCount === 2) {
+          const emptyTd = document.createElement('td');
+          emptyTd.style.display = 'none';
+          tr.appendChild(emptyTd);
+        }
+
+        const diffTd = document.createElement('td');
+        if (row.keyDifference === 'Identical') diffTd.className = 'key-diff-identical';
+        else if (row.keyDifference === 'Similar') diffTd.className = 'key-diff-similar';
+        else if (row.keyDifference === 'Different') diffTd.className = 'key-diff-different';
+        else if (row.keyDifference === 'Missing') diffTd.className = 'key-diff-missing';
+        diffTd.textContent = row.keyDifference;
+        tr.appendChild(diffTd);
+
+        tbody.appendChild(tr);
+      });
+
+      const exportBtn = document.getElementById('exportCsvBtn');
+      exportBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      const exportJsonBtn = document.getElementById('exportJsonBtn');
+      if (exportJsonBtn) {
+        exportJsonBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+      const aiAssistBtn = document.getElementById('aiAssistBtn');
+      if (aiAssistBtn) {
+        aiAssistBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+    }
+
+    // ---------- Core processing ----------
+    async function processFile(fileObj) {
+      const file = fileObj.file;
+      const id = fileObj.id;
+      fileObj.status = 'Processing';
+      fileObj.error = null;
+      fileObj.progress = 0;
+      renderFileCards();
+
+      const onProgress = p => {
+        const v = Math.max(0, Math.min(100, Math.round(p)));
+        fileObj.progress = v;
+        progressValues[id] = v;
+        renderFileCards();
+      };
+
+      let text = '';
+      let usedOcr = false;
+
+      try {
+        if (file.name.toLowerCase().endsWith('.txt')) {
+          text = await extractTextFromTxt(file);
+          onProgress(80);
+        } else if (file.name.toLowerCase().endsWith('.pdf')) {
+          text = await extractTextFromPdf(file, onProgress);
+          const textChars = (text || '').replace(/\s+/g, '').length;
+          if (textChars < 200) {
+            throw new Error(
+              'Scanned PDF detected – no text layer. Use OCR to attempt parsing (slower).'
+            );
+          }
+        } else {
+          throw new Error('Unsupported file type.');
+        }
+
+        text = filterToEnglishLines(text);
+        const minChars = usedOcr ? 30 : 50;
+        if (!text || text.replace(/\s+/g, '').length < minChars) {
+          throw new Error('Unable to extract meaningful text.');
+        }
+
+        fileObj.extractedText = text;
+        const sections = parseSections(text);
+        parsedDocuments[id] = sections;
+        processingStatus[id] = 'Ready';
+        fileObj.status = 'Ready';
+        fileObj.processingMode = usedOcr ? 'ocr' : 'text';
+        fileObj.error = null;
+        onProgress(100);
+      } catch (err) {
+        console.error('Error processing file', file.name, err);
+        const msg = (err && err.message) ? err.message : 'Unknown error during parsing.';
+        if (/Scanned PDF detected/i.test(msg)) {
+          processingStatus[id] = 'Scanned';
+          fileObj.status = 'Error';
+          fileObj.processingMode = 'none';
+          fileObj.error = msg;
+        } else {
+          processingStatus[id] = 'Error';
+          fileObj.status = 'Error';
+          fileObj.processingMode = 'none';
+          fileObj.error = msg || 'Unknown error during parsing.';
+        }
+        fileObj.progress = 100;
+        progressValues[id] = 100;
+      } finally {
+        renderFileCards();
+        const readyFiles = getReadyFiles();
+        if (readyFiles.length >= 2) {
+          compareSections(parsedDocuments);
+        }
+        renderComparisonTable();
+        const statusLabel = document.getElementById('compareStatusLabel');
+        const readyCount = getReadyFiles().length;
+        statusLabel.textContent =
+          readyCount >= 2
+            ? `Comparison based on ${readyCount} Ready products.`
+            : 'Waiting for at least 2 Ready products.';
+      }
+    }
+
+    async function runOcrForFile(fileId) {
+      const fileObj = uploadedFiles.find(f => f.id === fileId);
+      if (!fileObj) return;
+
+      const file = fileObj.file;
+      fileObj.status = 'Processing';
+      fileObj.error = null;
+      fileObj.progress = 0;
+      fileObj.processingMode = 'ocr';
+      renderFileCards();
+
+      const onProgress = p => {
+        const v = Math.max(0, Math.min(100, Math.round(p)));
+        fileObj.progress = v;
+        progressValues[fileId] = v;
+        renderFileCards();
+      };
+
+      let text = '';
+      try {
+        text = await performOcrFallback(file, onProgress);
+        text = filterToEnglishLines(text);
+        const minChars = 30;
+        if (!text || text.replace(/\s+/g, '').length < minChars) {
+          throw new Error('OCR result too limited for reliable parsing.');
+        }
+        fileObj.extractedText = text;
+        const sections = parseSections(text);
+        parsedDocuments[fileId] = sections;
+        processingStatus[fileId] = 'Ready';
+        fileObj.status = 'Ready';
+        fileObj.processingMode = 'ocr';
+        fileObj.error = null;
+        onProgress(100);
+      } catch (err) {
+        console.error('OCR error for file', fileObj.name, err);
+        processingStatus[fileId] = 'Error';
+        fileObj.status = 'Error';
+        fileObj.processingMode = 'none';
+        fileObj.error = (err && err.message) ? err.message : 'OCR failed for this scanned insert.';
+        fileObj.progress = 100;
+        progressValues[fileId] = 100;
+      } finally {
+        renderFileCards();
+        const readyFiles = getReadyFiles();
+        if (readyFiles.length >= 2) {
+          compareSections(parsedDocuments);
+        }
+        renderComparisonTable();
+      }
+    }
+
+    // ---------- Init ----------
+    function init() {
+      updateFileCountDisplay();
+      renderFileCards();
+      renderComparisonTable();
+
+      document.getElementById('clearAllBtn').addEventListener('click', clearAllFiles);
+      document.getElementById('exportCsvBtn').addEventListener('click', exportComparisonCsv);
+      document.getElementById('exportJsonBtn').addEventListener('click', exportComparisonJsonForAi);
+      document.getElementById('aiAssistBtn').addEventListener('click', showAiAssistPlaceholder);
+
+      const fileInput = document.getElementById('fileInput');
+      fileInput.addEventListener('change', e => {
+        addFiles(e.target.files);
+        fileInput.value = '';
+      });
+
+      const dropzone = document.getElementById('dropzone');
+      ['dragenter', 'dragover'].forEach(evt =>
+        dropzone.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('dragover');
+        })
+      );
+      ['dragleave', 'drop'].forEach(evt =>
+        dropzone.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('dragover');
+        })
+      );
+      dropzone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files) {
+          addFiles(dt.files);
+        }
+      });
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      document.getElementById('tableContainer').classList.add('scrollbar');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
