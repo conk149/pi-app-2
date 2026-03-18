@@ -9,14 +9,14 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.min.js"></script>
   <script>
     // Normalise pdfjsLib onto window.pdfjsLib
-    window.pdfjsLib =
-      window.pdfjsLib || window['pdfjsLib'] || window['pdfjs-dist/build/pdf'];
+    window.pdfjsLib = window.pdfjsLib || window['pdfjsLib'];
 
     if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.js';
     } else {
       console.error('PDF.js library not available on window.pdfjsLib');
+      console.log('Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('pdf')));
     }
   </script>
   <!-- Optional Tesseract.js (OCR stub only – can be wired later)
