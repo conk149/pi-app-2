@@ -1447,8 +1447,39 @@
       }
 
       // ------------------------------
-      // AI assist click handler – Part 3 will add actual modes
+      // AI assist stubs – connect to real models/APIs later
       // ------------------------------
+
+      async function runLocalAiAssist(sectionName, textBundle) {
+        // Hook for local/browser model (e.g. WebLLM, local LLM).
+        // Replace this alert with real integration when ready.
+        alert(
+          'Local AI hook (stub) for section: ' +
+            sectionName +
+            '\n\nText (first 800 chars):\n\n' +
+            textBundle.slice(0, 800)
+        );
+      }
+
+      async function runRemoteAiAssist(sectionName, textBundle) {
+        // Hook for remote API model – replace URL and payload with your own.
+        // Example only (commented out):
+        //
+        // const response = await fetch('https://your-endpoint.example.com/pi-ai', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({ section: sectionName, text: textBundle })
+        // });
+        // const data = await response.json();
+        // alert('API AI response:\\n\\n' + (data.summary || JSON.stringify(data, null, 2)));
+        //
+        alert(
+          'API AI hook (stub) for section: ' +
+            sectionName +
+            '\n\nText (first 800 chars):\n\n' +
+            textBundle.slice(0, 800)
+        );
+      }
 
       function handleAiAssistClick(sectionId) {
         const mode = state.settings.aiMode || 'none';
@@ -1471,36 +1502,35 @@
         }
 
         if (mode === 'local') {
-          alert(
-            'Local AI mode selected.\n\n' +
-              'In Part 3 you can wire runLocalAiAssist() to a local WebLLM or other browser model.\n\n' +
-              'Section:\n' +
-              row.name +
-              '\n\n' +
-              texts.slice(0, 1200)
-          );
+          runLocalAiAssist(row.name, texts);
           return;
         }
 
         if (mode === 'api') {
-          alert(
-            'API AI mode selected.\n\n' +
-              'In Part 3 you can wire runRemoteAiAssist() to your HTTP endpoint.\n\n' +
-              'Section:\n' +
-              row.name +
-              '\n\n' +
-              texts.slice(0, 1200)
-          );
+          runRemoteAiAssist(row.name, texts);
           return;
         }
+
+        alert('Unknown AI mode: ' + mode);
       }
 
       // ------------------------------
-      // Init – Part 3 will extend this with AI mode wiring
+      // Init – wire AI mode select as well
       // ------------------------------
+
+      function attachAiModeHandler() {
+        const select = document.getElementById('aiModeSelect');
+        if (!select) return;
+        select.value = state.settings.aiMode || 'none';
+        select.addEventListener('change', () => {
+          const value = select.value || 'none';
+          state.settings.aiMode = value;
+        });
+      }
 
       document.addEventListener('DOMContentLoaded', () => {
         attachCoreEventHandlers();
+        attachAiModeHandler();
         render();
       });
     </script>
