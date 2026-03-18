@@ -776,3 +776,731 @@
   </div>
 </body>
 </html>
+    <script>
+      // ------------------------------
+      // PI Comparator v2.1 – Core Logic (Part 2)
+      // ------------------------------
+
+      const state = {
+        files: [],
+        sections: [],
+        comparison: [],
+        settings: {
+          aiMode: 'none', // updated in Part 3
+        },
+      };
+
+      // ------------------------------
+      // Section configuration – English PI headings
+      // ------------------------------
+
+      const sectionConfigs = [
+        {
+          id: 'indications',
+          name: 'Indications',
+          keywords: [
+            'indications and clinical use',
+            'indications',
+            'therapeutic indications',
+            'uses'
+          ],
+          synonyms: ['clinical use', 'approved indications', 'intended use']
+        },
+        {
+          id: 'dosage_admin',
+          name: 'Dosage and Administration',
+          keywords: [
+            'dosage and administration',
+            'recommended dose',
+            'posology',
+            'administration',
+            'adult dosage',
+            'paediatric dosage',
+            'pediatric dosage'
+          ],
+          synonyms: ['dose', 'dosage', 'how to take', 'how to use', 'infusion rate']
+        },
+        {
+          id: 'dilution_reconstitution',
+          name: 'Dilution / Reconstitution',
+          keywords: [
+            'dilution',
+            'reconstitution',
+            'reconstitute',
+            'preparation for administration',
+            'preparation'
+          ],
+          synonyms: ['dilute', 'reconstituted solution', 'reconstituted']
+        },
+        {
+          id: 'compatibility',
+          name: 'Compatible Diluents (NS, D5W, others)',
+          keywords: [
+            'compatibility',
+            'compatible diluents',
+            'compatible solutions',
+            'compatibility and stability',
+            'diluents'
+          ],
+          synonyms: ['normal saline', 'sodium chloride', 'ns', 'dextrose 5%', 'd5w', 'lactated ringer']
+        },
+        {
+          id: 'contraindications',
+          name: 'Contraindications',
+          keywords: [
+            'contraindications',
+            'who should not receive',
+            'contra-indications'
+          ],
+          synonyms: ['must not be used', 'do not use in', 'is contraindicated']
+        },
+        {
+          id: 'warnings_precautions',
+          name: 'Warnings and Precautions',
+          keywords: [
+            'warnings and precautions',
+            'warnings',
+            'special warnings and precautions for use',
+            'precautions'
+          ],
+          synonyms: ['monitoring', 'risk factors', 'special warnings']
+        },
+        {
+          id: 'cautions_special',
+          name: 'Cautions / Special Populations',
+          keywords: [
+            'special populations',
+            'use in specific populations',
+            'use in elderly',
+            'use in paediatric',
+            'use in pediatric',
+            'pregnancy and lactation'
+          ],
+          synonyms: ['renal impairment', 'hepatic impairment', 'pregnancy', 'breast-feeding', 'breastfeeding']
+        },
+        {
+          id: 'side_effects',
+          name: 'Side Effects / Adverse Reactions',
+          keywords: [
+            'adverse reactions',
+            'adverse effects',
+            'side effects',
+            'undesirable effects'
+          ],
+          synonyms: ['safety profile', 'post-marketing experience', 'postmarketing experience']
+        },
+        {
+          id: 'interactions',
+          name: 'Drug Interactions',
+          keywords: [
+            'drug interactions',
+            'interactions',
+            'interactions with other medicinal products',
+            'drug-drug interactions'
+          ],
+          synonyms: ['interaction', 'concomitant use', 'co-administration', 'coadministration']
+        },
+        {
+          id: 'storage',
+          name: 'Storage and Stability',
+          keywords: [
+            'storage and stability',
+            'storage',
+            'stability',
+            'shelf life',
+            'how to store'
+          ],
+          synonyms: [
+            'store at',
+            'refrigerate',
+            'room temperature',
+            'shelf-life',
+            'expiry',
+            'expiration'
+          ]
+        }
+      ];
+
+      // ------------------------------
+      // Utilities
+      // ------------------------------
+
+      function createId() {
+        return 'f_' + Math.random().toString(36).slice(2, 10);
+      }
+
+      function humanFileSize(bytes) {
+        if (!bytes && bytes !== 0) return '';
+        const thresh = 1024;
+        if (Math.abs(bytes) < thresh) {
+          return bytes + ' B';
+        }
+        const units = ['KB', 'MB', 'GB'];
+        let u = -1;
+        do {
+          bytes /= thresh;
+          ++u;
+        } while (Math.abs(bytes) >= thresh && u < units.length - 1);
+        return bytes.toFixed(1) + ' ' + units[u];
+      }
+
+      function normaliseWhitespace(text) {
+        return (text || '')
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
+      function collapseSpacedLetters(text) {
+        if (!text) return '';
+        return text.replace(/\b([A-Z])(?:\s([A-Z])){2,}\b/g, (match) => {
+          const letters = match.split(/\s+/);
+          const word = letters.join('');
+          if (word.length <= 2) return match;
+          return word;
+        });
+      }
+
+      function cleanOcrText(text) {
+        let out = text || '';
+        out = collapseSpacedLetters(out);
+        out = out.replace(/\b(\w+)(\s+\1\b)+/gi, '$1');
+        out = normaliseWhitespace(out);
+        return out;
+      }
+
+      function isPdfFile(file) {
+        return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      }
+
+      // ------------------------------
+      // File management
+      // ------------------------------
+
+      function addFiles(fileList) {
+        const incoming = Array.from(fileList || []);
+        for (const file of incoming) {
+          if (state.files.length >= 3) break;
+          const id = createId();
+          state.files.push({
+            id,
+            file,
+            name: file.name,
+            size: file.size,
+            type: file.type || '',
+            status: 'pending', // pending | extracting | parsed | error
+            error: '',
+            rawText: '',
+            sections: {}
+          });
+        }
+        render();
+      }
+
+      function clearAllFiles() {
+        state.files = [];
+        state.comparison = [];
+        render();
+      }
+
+      // ------------------------------
+      // Text extraction (PDF.js + simple OCR stub)
+      // ------------------------------
+
+      async function extractTextFromPdf(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item) => item.str || '').join(' ');
+          fullText += '\n' + pageText;
+        }
+        return normaliseWhitespace(fullText);
+      }
+
+      async function extractTextFromTxt(file) {
+        const text = await file.text();
+        return normaliseWhitespace(text);
+      }
+
+      async function runOcrFallback(file) {
+        // Placeholder only. Real OCR wiring can be added later via Tesseract.js.
+        console.warn('OCR fallback not wired yet – returning empty string.');
+        return '';
+      }
+
+      async function extractTextForFile(doc) {
+        const file = doc.file;
+        if (isPdfFile(file)) {
+          try {
+            let text = await extractTextFromPdf(file);
+            if (!text || text.length < 200) {
+              const ocrText = await runOcrFallback(file);
+              text = cleanOcrText(ocrText || text);
+            }
+            return text;
+          } catch (err) {
+            console.error('PDF extraction failed, trying OCR fallback', err);
+            const ocrText = await runOcrFallback(file);
+            return cleanOcrText(ocrText || '');
+          }
+        } else {
+          return await extractTextFromTxt(file);
+        }
+      }
+
+      // ------------------------------
+      // Section parsing
+      // ------------------------------
+
+      function findSectionBounds(text, patterns) {
+        const lower = text.toLowerCase();
+        const hits = [];
+
+        for (const cfg of patterns) {
+          const allTerms = [...(cfg.keywords || []), ...(cfg.synonyms || [])];
+          for (const term of allTerms) {
+            const idx = lower.indexOf(term.toLowerCase());
+            if (idx !== -1) {
+              hits.push({ id: cfg.id, index: idx });
+              break;
+            }
+          }
+        }
+
+        hits.sort((a, b) => a.index - b.index);
+
+        const result = {};
+        for (let i = 0; i < hits.length; i++) {
+          const cur = hits[i];
+          const next = hits[i + 1];
+          const start = cur.index;
+          const end = next ? next.index : text.length;
+          result[cur.id] = text.slice(start, end).trim();
+        }
+        return result;
+      }
+
+      function parseSectionsFromText(text) {
+        const cleaned = normaliseWhitespace(text);
+        const bounds = findSectionBounds(cleaned, sectionConfigs);
+        const sections = {};
+        for (const cfg of sectionConfigs) {
+          const raw = bounds[cfg.id] || '';
+          sections[cfg.id] = {
+            id: cfg.id,
+            name: cfg.name,
+            raw: raw,
+            summary: raw ? raw.slice(0, 400) + (raw.length > 400 ? ' …' : '') : ''
+          };
+        }
+        return sections;
+      }
+
+      // ------------------------------
+      // Comparison building
+      // ------------------------------
+
+      function classifyDifference(cellTexts) {
+        const nonEmpty = cellTexts.filter((t) => !!t && t.trim().length > 0);
+        if (nonEmpty.length <= 1) return 'same';
+        const norm = nonEmpty.map((t) =>
+          t.toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9%/().,+-]+/g, ' ').trim()
+        );
+        const unique = Array.from(new Set(norm));
+        if (unique.length === 1) return 'same';
+        if (unique.length === 2) return 'partial';
+        return 'different';
+      }
+
+      function buildComparison() {
+        const rows = [];
+        const files = state.files;
+        if (!files.length) {
+          state.comparison = [];
+          return;
+        }
+
+        for (const cfg of sectionConfigs) {
+          const row = {
+            id: cfg.id,
+            name: cfg.name,
+            cells: [],
+            status: 'same'
+          };
+          const cellTexts = [];
+          for (const doc of files) {
+            const sec = (doc.sections && doc.sections[cfg.id]) || null;
+            const txt = sec && sec.raw ? sec.raw : '';
+            cellTexts.push(txt);
+            row.cells.push({
+              text: txt,
+              summary: sec ? sec.summary : '',
+              missing: !txt
+            });
+          }
+          row.status = classifyDifference(cellTexts);
+          rows.push(row);
+        }
+        state.comparison = rows;
+      }
+
+      // ------------------------------
+      // Rendering – file list & table
+      // ------------------------------
+
+      function renderFileCards() {
+        const container = document.getElementById('fileList');
+        container.innerHTML = '';
+
+        if (!state.files.length) {
+          const empty = document.createElement('div');
+          empty.style.fontSize = '11px';
+          empty.style.color = 'var(--text-soft)';
+          empty.style.padding = '4px 4px 2px';
+          empty.textContent =
+            'No files yet. Add 2–3 English PIs (PDF or text) to start comparison.';
+          container.appendChild(empty);
+          return;
+        }
+
+        for (const doc of state.files) {
+          const card = document.createElement('div');
+          card.className = 'file-card';
+
+          const main = document.createElement('div');
+          main.className = 'file-card-main';
+
+          const title = document.createElement('div');
+          title.className = 'file-name';
+          title.textContent = doc.name;
+
+          const meta = document.createElement('div');
+          meta.className = 'file-meta';
+          const size = document.createElement('span');
+          size.textContent = humanFileSize(doc.size);
+          meta.appendChild(size);
+
+          const status = document.createElement('div');
+          status.className = 'status-chip';
+          const dot = document.createElement('span');
+          dot.className = 'status-dot';
+
+          if (doc.status === 'parsed') {
+            dot.classList.add('status-dot--ok');
+          } else if (doc.status === 'error') {
+            dot.classList.add('status-dot--err');
+          } else if (doc.status === 'extracting') {
+            dot.classList.add('status-dot--warn');
+          }
+
+          const label = document.createElement('span');
+          if (doc.status === 'pending') label.textContent = 'Pending';
+          else if (doc.status === 'extracting') label.textContent = 'Extracting…';
+          else if (doc.status === 'parsed') label.textContent = 'Parsed';
+          else label.textContent = 'Error';
+
+          status.appendChild(dot);
+          status.appendChild(label);
+
+          main.appendChild(title);
+          main.appendChild(meta);
+          main.appendChild(status);
+
+          const actions = document.createElement('div');
+          actions.className = 'file-card-actions';
+
+          const showTextBtn = document.createElement('button');
+          showTextBtn.type = 'button';
+          showTextBtn.className = 'link-button';
+          showTextBtn.textContent = 'Show extracted text';
+          showTextBtn.disabled = !doc.rawText;
+          showTextBtn.addEventListener('click', () => {
+            if (!doc.rawText) return;
+            const win = window.open('', '_blank');
+            if (win) {
+              win.document.write('<pre style="white-space: pre-wrap; font-family: system-ui, sans-serif; font-size: 12px;">');
+              win.document.write(
+                doc.rawText
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+              );
+              win.document.write('</pre>');
+              win.document.close();
+            }
+          });
+
+          actions.appendChild(showTextBtn);
+          card.appendChild(main);
+          card.appendChild(actions);
+          container.appendChild(card);
+        }
+      }
+
+      function renderComparisonTable() {
+        const container = document.getElementById('comparisonTableContainer');
+        container.innerHTML = '';
+
+        if (!state.files.length) {
+          const empty = document.createElement('div');
+          empty.style.fontSize = '11px';
+          empty.style.color = 'var(--text-soft)';
+          empty.style.padding = '4px 6px';
+          empty.textContent = 'Add 2–3 PIs on the left to see section-by-section comparison here.';
+          container.appendChild(empty);
+          return;
+        }
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+
+        const thSection = document.createElement('th');
+        thSection.className = 'section-name-cell';
+        thSection.textContent = 'Section';
+        headerRow.appendChild(thSection);
+
+        for (const doc of state.files) {
+          const th = document.createElement('th');
+          th.textContent = doc.name;
+          headerRow.appendChild(th);
+        }
+
+        const thAi = document.createElement('th');
+        thAi.className = 'ai-assist-cell';
+        thAi.textContent = 'AI assist';
+        headerRow.appendChild(thAi);
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+
+        for (const row of state.comparison) {
+          const tr = document.createElement('tr');
+          if (row.status === 'same') tr.className = 'section-same';
+          else if (row.status === 'partial') tr.className = 'section-partial';
+          else if (row.status === 'different') tr.className = 'section-different';
+
+          const tdName = document.createElement('td');
+          tdName.className = 'section-name-cell';
+          tdName.textContent = row.name;
+          tbody.appendChild(tr);
+          tr.appendChild(tdName);
+
+          row.cells.forEach((cell) => {
+            const td = document.createElement('td');
+            const summary = cell.summary || (cell.text ? cell.text.slice(0, 160) : '');
+            td.textContent = summary || '—';
+            if (cell.text) {
+              td.title = cell.text;
+            } else {
+              td.style.color = 'var(--text-soft)';
+            }
+            tr.appendChild(td);
+          });
+
+          const tdAi = document.createElement('td');
+          tdAi.className = 'ai-assist-cell';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-ghost';
+          btn.style.fontSize = '10px';
+          btn.textContent = 'Ask AI about this section';
+          btn.dataset.sectionId = row.id;
+          btn.addEventListener('click', () => {
+            handleAiAssistClick(row.id);
+          });
+          tdAi.appendChild(btn);
+          tr.appendChild(tdAi);
+        }
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+      }
+
+      function render() {
+        renderFileCards();
+        buildComparison();
+        renderComparisonTable();
+      }
+
+      // ------------------------------
+      // Export CSV
+      // ------------------------------
+
+      function exportComparisonCsv() {
+        if (!state.files.length || !state.comparison.length) return;
+        const headers = ['Section', ...state.files.map((f) => f.name)];
+        const rows = [headers];
+        for (const row of state.comparison) {
+          const line = [row.name];
+          for (const cell of row.cells) {
+            const txt = (cell.text || '').replace(/\r?\n+/g, ' ').replace(/"/g, '""').trim();
+            line.push(txt);
+          }
+          rows.push(line);
+        }
+        const csv = rows
+          .map((r) => r.map((v) => `"${v}"`).join(','))
+          .join('\r\n');
+        const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csv], {
+          type: 'text/csv;charset=utf-8;'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pi_comparison_v2_1.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // ------------------------------
+      // Event wiring – upload + process all + export
+      // ------------------------------
+
+      function attachCoreEventHandlers() {
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const browseButton = document.getElementById('browseButton');
+        const clearAllButton = document.getElementById('clearAllButton');
+        const processAllButton = document.getElementById('processAllButton');
+        const exportCsvButton = document.getElementById('exportCsvButton');
+
+        if (!dropzone || !fileInput || !browseButton) return;
+
+        ['dragenter', 'dragover'].forEach((evtName) => {
+          dropzone.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('highlight');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach((evtName) => {
+          dropzone.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('highlight');
+          });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+          const dt = e.dataTransfer;
+          if (!dt) return;
+          addFiles(dt.files);
+        });
+
+        browseButton.addEventListener('click', () => {
+          fileInput.click();
+        });
+
+        fileInput.addEventListener('change', () => {
+          if (!fileInput.files) return;
+          addFiles(fileInput.files);
+          fileInput.value = '';
+        });
+
+        clearAllButton.addEventListener('click', () => {
+          clearAllFiles();
+        });
+
+        processAllButton.addEventListener('click', async () => {
+          if (!state.files.length) return;
+          processAllButton.disabled = true;
+          const originalLabel = processAllButton.textContent;
+          processAllButton.textContent = 'Processing…';
+
+          for (const doc of state.files) {
+            if (doc.status === 'parsed') continue;
+            doc.status = 'extracting';
+            render();
+
+            try {
+              const text = await extractTextForFile(doc);
+              doc.rawText = text;
+              doc.sections = parseSectionsFromText(text);
+              doc.status = 'parsed';
+            } catch (err) {
+              console.error('Failed to process document', err);
+              doc.status = 'error';
+              doc.error = String(err);
+            }
+
+            render();
+          }
+
+          processAllButton.disabled = false;
+          processAllButton.textContent = originalLabel;
+        });
+
+        exportCsvButton.addEventListener('click', () => {
+          exportComparisonCsv();
+        });
+      }
+
+      // ------------------------------
+      // AI assist click handler – Part 3 will add actual modes
+      // ------------------------------
+
+      function handleAiAssistClick(sectionId) {
+        const mode = state.settings.aiMode || 'none';
+        const row = state.comparison.find((r) => r.id === sectionId);
+        if (!row) return;
+
+        const texts = row.cells
+          .map((c, idx) => {
+            const name = state.files[idx] ? state.files[idx].name : `PI ${idx + 1}`;
+            return `${name}:\n${c.text || '[missing section]'}`;
+          })
+          .join('\n\n---\n\n');
+
+        if (mode === 'none') {
+          alert(
+            'AI mode is set to "No AI (rules only)".\n\n' +
+              'Open Settings → AI Mode and choose "Local AI" or "API AI" to enable assistance.'
+          );
+          return;
+        }
+
+        if (mode === 'local') {
+          alert(
+            'Local AI mode selected.\n\n' +
+              'In Part 3 you can wire runLocalAiAssist() to a local WebLLM or other browser model.\n\n' +
+              'Section:\n' +
+              row.name +
+              '\n\n' +
+              texts.slice(0, 1200)
+          );
+          return;
+        }
+
+        if (mode === 'api') {
+          alert(
+            'API AI mode selected.\n\n' +
+              'In Part 3 you can wire runRemoteAiAssist() to your HTTP endpoint.\n\n' +
+              'Section:\n' +
+              row.name +
+              '\n\n' +
+              texts.slice(0, 1200)
+          );
+          return;
+        }
+      }
+
+      // ------------------------------
+      // Init – Part 3 will extend this with AI mode wiring
+      // ------------------------------
+
+      document.addEventListener('DOMContentLoaded', () => {
+        attachCoreEventHandlers();
+        render();
+      });
+    </script>
