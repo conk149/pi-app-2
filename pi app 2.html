@@ -5,23 +5,19 @@
   <title>PI Comparator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- PDF.js (UMD build) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <!-- PDF.js -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.min.js"></script>
   <script>
-    (function () {
-      var lib = window['pdfjsLib'] || window['pdfjs-dist'] || window['pdfjs'];
-      if (!lib) {
-        console.error('PDF.js library failed to load – PDF extraction will not work.');
-        return;
-      }
-      window.pdfjsLib = lib;
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-      } catch (e) {
-        console.warn('Failed to set PDF.js workerSrc', e);
-      }
-    })();
+    // Normalise pdfjsLib onto window.pdfjsLib
+    window.pdfjsLib =
+      window.pdfjsLib || window['pdfjsLib'] || window['pdfjs-dist/build/pdf'];
+
+    if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.js';
+    } else {
+      console.error('PDF.js library not available on window.pdfjsLib');
+    }
   </script>
 
   <!-- Tesseract.js (OCR fallback) -->
