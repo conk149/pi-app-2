@@ -2,1544 +2,1656 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <title>PI Comparator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PI Comparator v2.1 – English PI Comparison</title>
 
-  <!-- PDF.js -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.min.js"></script>
+  <!-- PDF.js (UMD build) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script>
-    // Normalise pdfjsLib onto window.pdfjsLib
-    window.pdfjsLib = window.pdfjsLib || window['pdfjsLib'];
-
-    if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.js';
-    } else {
-      console.error('PDF.js library not available on window.pdfjsLib');
-      console.log('Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('pdf')));
-    }
+    (function () {
+      var lib = window['pdfjsLib'] || window['pdfjs-dist'] || window['pdfjs'];
+      if (!lib) {
+        console.error('PDF.js library failed to load – PDF extraction will not work.');
+        return;
+      }
+      window.pdfjsLib = lib;
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      } catch (e) {
+        console.warn('Failed to set PDF.js workerSrc', e);
+      }
+    })();
   </script>
-  <!-- Optional Tesseract.js (OCR stub only – can be wired later)
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
-  -->
+
+  <!-- Tesseract.js (OCR fallback) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #020617;
-      --bg-elevated: #020617;
-      --bg-soft: #020617;
-      --border: #1f2937;
-      --accent: #38bdf8;
-      --accent-soft: rgba(56, 189, 248, 0.14);
-      --accent-strong: rgba(56, 189, 248, 0.3);
-      --text: #e5e7eb;
-      --text-soft: #9ca3af;
-      --danger: #f97373;
-      --danger-soft: rgba(248, 113, 113, 0.16);
-      --warning-soft: rgba(251, 191, 36, 0.14);
-      --success-soft: rgba(34, 197, 94, 0.14);
-      --chip-bg: #020617;
-      --radius-lg: 18px;
-      --radius-md: 12px;
-      --radius-sm: 8px;
-      --shadow-soft: 0 22px 55px rgba(15, 23, 42, 0.9);
-      --shadow-faint: 0 8px 20px rgba(15, 23, 42, 0.8);
-      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "Segoe UI", sans-serif;
+      --bg-color: #f7f3e9;
+      --bg-elevated: #ffffff;
+      --text-color: #243238;
+      --muted-text: #607d8b;
+      --primary: #00897b;
+      --primary-soft: rgba(0, 137, 123, 0.08);
+      --danger: #c62828;
+      --warning: #ff8f00;
+      --border-color: #d7ccc8;
+      --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.06);
+      --accent: #00695c;
+      --badge-ready-bg: #e0f2f1;
+      --badge-ready-text: #00695c;
+      --badge-processing-bg: #fff3e0;
+      --badge-processing-text: #ef6c00;
+      --badge-error-bg: #ffebee;
+      --badge-error-text: #c62828;
+      --file-card-bg: #ffffff;
+      --table-header-bg: #eceff1;
+      --table-row-alt: #fafafa;
+      --highlight-unique: #fff8e1;
+      --scrollbar-thumb: #b0bec5;
+      --scrollbar-track: #eceff1;
     }
 
     * {
       box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
       margin: 0;
       padding: 0;
-      height: 100%;
-      background: radial-gradient(circle at top left, #020617 0, #000 55%, #020617 100%);
-      color: var(--text);
-      font-family: var(--font-sans);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg-color);
+      color: var(--text-color);
     }
 
     body {
-      display: flex;
-      justify-content: center;
-      align-items: stretch;
-      padding: 20px;
+      padding: 16px 24px 32px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted-text);
+      font-size: 13px;
     }
 
     .app-shell {
-      width: 100%;
-      max-width: 1440px;
-      max-height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: radial-gradient(circle at top left, #020617, #020617 48%, #000 110%);
-      border-radius: 26px;
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      box-shadow: var(--shadow-soft);
-      overflow: hidden;
+      max-width: 1320px;
+      margin: 0 auto;
     }
 
-    .app-header {
+    .top-bar {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(31, 41, 55, 0.9);
-      backdrop-filter: blur(24px);
-      background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
-        radial-gradient(circle at top right, rgba(147, 51, 234, 0.16), transparent 55%),
-        rgba(15, 23, 42, 0.98);
-      position: relative;
-      z-index: 3;
-    }
-
-    .app-header__left {
-      display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      margin-bottom: 12px;
     }
 
-    .logo-pill {
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      background: conic-gradient(from 210deg, #22d3ee, #0ea5e9, #6366f1, #a855f7, #22d3ee);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2px;
-      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8),
-        0 8px 18px rgba(15, 23, 42, 0.95);
-    }
-
-    .logo-pill-inner {
-      width: 100%;
-      height: 100%;
-      border-radius: inherit;
-      background: radial-gradient(circle at 30% 0, rgba(248, 250, 252, 0.9), #0f172a);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .logo-pill-inner::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(circle at 20% 0, rgba(248, 250, 252, 0.9), transparent 40%),
-        linear-gradient(to bottom right, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.9));
-      mix-blend-mode: screen;
-      opacity: 0.9;
-    }
-
-    .logo-pill-icon {
-      width: 14px;
-      height: 18px;
-      border-radius: 4px 4px 10px 10px;
-      border: 1.3px solid rgba(30, 64, 175, 0.8);
-      background: linear-gradient(to bottom, rgba(248, 250, 252, 0.98), #1d4ed8);
-      box-shadow:
-        0 6px 10px rgba(15, 23, 42, 0.85),
-        0 0 0 1px rgba(191, 219, 254, 0.7);
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .logo-pill-icon::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(
-          145deg,
-          rgba(248, 250, 252, 0.95),
-          rgba(191, 219, 254, 0.9),
-          rgba(37, 99, 235, 0.95)
-        );
-      opacity: 0.85;
-    }
-
-    .logo-pill-icon::after {
-      content: "";
-      position: absolute;
-      inset: 1px 2px auto;
-      height: 40%;
-      border-radius: 3px 3px 9px 9px;
-      background:
-        repeating-linear-gradient(
-          135deg,
-          rgba(15, 23, 42, 0.04),
-          rgba(15, 23, 42, 0.04) 1px,
-          rgba(148, 163, 184, 0.12) 2px,
-          rgba(15, 23, 42, 0.04) 3px
-        );
-      box-shadow: 0 -1px 0 rgba(15, 23, 42, 0.5) inset;
-    }
-
-    .app-title-block {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-
-    .app-title {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .app-badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 999px;
-      background: rgba(16, 185, 129, 0.18);
-      color: #6ee7b7;
-      border: 1px solid rgba(16, 185, 129, 0.5);
-    }
-
-    .app-subtitle {
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-
-    .app-header__right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(30, 64, 175, 0.55);
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-
-    .chip-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: #22c55e;
-      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
-    }
-
-    .btn {
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      background: rgba(15, 23, 42, 0.9);
-      color: var(--text);
-      font-size: 12px;
-      padding: 6px 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      transition: background 0.16s ease, border-color 0.16s ease, transform 0.08s ease;
-    }
-
-    .btn:hover {
-      background: rgba(15, 23, 42, 1);
-      border-color: rgba(148, 163, 184, 0.9);
-      transform: translateY(-0.5px);
-    }
-
-    .btn-primary {
-      background: linear-gradient(to right, #0ea5e9, #6366f1);
-      border-color: transparent;
-      color: white;
-      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.55);
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(to right, #0284c7, #4f46e5);
-      box-shadow: 0 10px 26px rgba(37, 99, 235, 0.7);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      border-color: rgba(51, 65, 85, 0.9);
-    }
-
-    .btn-icon {
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      border-radius: 999px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    main.app-main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.1fr);
-      gap: 16px;
-      padding: 14px 16px 16px;
-      background:
-        radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), transparent 55%),
-        rgba(15, 23, 42, 0.98);
-    }
-
-    .panel {
-      background: radial-gradient(circle at top left, #020617, #020617 60%, #020617 100%);
-      border-radius: 18px;
-      border: 1px solid rgba(31, 41, 55, 0.95);
-      box-shadow: var(--shadow-faint);
-      padding: 10px 10px 12px;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      padding: 0 4px;
-    }
-
-    .panel-title {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text-soft);
-    }
-
-    .panel-subtitle {
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-
-    .dropzone {
-      margin-top: 4px;
-      border-radius: 14px;
-      border: 1px dashed rgba(55, 65, 81, 0.9);
-      background: radial-gradient(circle at top left, #020617, #020617 64%, #020617 100%);
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      gap: 8px;
-    }
-
-    .dropzone.highlight {
-      border-color: rgba(56, 189, 248, 0.9);
-      background: radial-gradient(circle at top left, #020617, #0b1120 64%, #020617 100%);
-      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
-    }
-
-    .dropzone-title {
-      font-size: 13px;
-      font-weight: 500;
-    }
-
-    .dropzone-subtitle {
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-
-    .dropzone-actions {
+    .top-actions {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+    }
+
+    button {
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--text-color);
+      font-size: 13px;
+      padding: 6px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: var(--shadow-soft);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    button.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      color: var(--muted-text);
+    }
+
+    .upload-section {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+      align-items: flex-start;
+    }
+
+    @media (max-width: 900px) {
+      .upload-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dropzone {
+      border: 1px dashed var(--border-color);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 16px 14px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      box-shadow: var(--shadow-soft);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .dropzone-desc {
+      font-size: 12px;
+      color: var(--muted-text);
+      margin-bottom: 10px;
+    }
+
+    .counter-row {
+      display: flex;
       justify-content: center;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted-text);
     }
 
-    .file-input {
-      display: none;
+    .counter-pill {
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      font-weight: 600;
     }
 
-    .file-list {
-      margin-top: 10px;
+    .counter-pill.ready {
+      color: #1b5e20;
+      background: #e8f5e9;
+      border-color: #a5d6a7;
+    }
+
+    .hint-text {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted-text);
+    }
+
+    .files-panel {
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-soft);
+      min-height: 88px;
+      border: 1px solid var(--border-color);
+    }
+
+    .files-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .files-header-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .files-list {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      overflow: auto;
-      padding-right: 2px;
+    }
+
+    .empty-state {
+      font-size: 12px;
+      color: var(--muted-text);
+      padding: 8px 0 4px;
     }
 
     .file-card {
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--file-card-bg);
+      padding: 8px 10px;
       display: grid;
-      grid-template-columns: 1.4fr auto;
-      gap: 8px;
-      padding: 8px 9px;
-      border-radius: 12px;
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      background: radial-gradient(circle at top left, #020617, #020617 64%, #020617 100%);
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      box-shadow: var(--shadow-soft);
     }
 
-    .file-card-main {
+    .file-main {
+      min-width: 0;
+    }
+
+    .file-title-row {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      justify-content: space-between;
     }
 
     .file-name {
-      font-size: 12px;
-      font-weight: 500;
-      word-break: break-word;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .file-meta {
       font-size: 11px;
-      color: var(--text-soft);
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+      color: var(--muted-text);
     }
 
-    .status-chip {
+    .status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      padding: 2px 7px;
+      gap: 5px;
+    }
+
+    .status-processing {
+      background: var(--badge-processing-bg);
+      color: var(--badge-processing-text);
+    }
+
+    .status-ready {
+      background: var(--badge-ready-bg);
+      color: var(--badge-ready-text);
+    }
+
+    .status-error {
+      background: var(--badge-error-bg);
+      color: var(--badge-error-text);
+    }
+
+    .status-ocr {
+      background: rgba(25, 118, 210, 0.1);
+      color: #1565c0;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
       border-radius: 999px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(51, 65, 85, 0.9);
-      color: var(--text-soft);
+      background: currentColor;
     }
 
-    .status-dot {
-      width: 6px;
-      height: 6px;
+    .spinner {
+      width: 10px;
+      height: 10px;
       border-radius: 999px;
-      background: #6b7280;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      animation: spin 0.7s linear infinite;
     }
 
-    .status-dot--ok {
-      background: #22c55e;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
-    .status-dot--warn {
-      background: #eab308;
+    .progress-bar {
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.06);
+      margin-top: 4px;
     }
 
-    .status-dot--err {
-      background: #ef4444;
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--primary), #4dd0e1);
+      width: 0;
+      transition: width 0.15s ease;
     }
 
-    .file-card-actions {
+    .file-actions {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 6px;
-    }
-
-    .link-button {
-      background: none;
-      border: none;
-      color: #93c5fd;
-      font-size: 11px;
-      padding: 0;
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-
-    .link-button:hover {
-      color: #bfdbfe;
-    }
-
-    .comparison-wrapper {
-      flex: 1;
-      margin-top: 6px;
-      border-radius: 14px;
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      background: radial-gradient(circle at top left, #020617, #020617 64%, #020617 100%);
-      padding: 10px 10px 8px;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .comparison-controls {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .comparison-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      font-size: 11px;
-      color: var(--text-soft);
-    }
-
-    .legend-pill {
-      display: inline-flex;
-      align-items: center;
       gap: 4px;
-      padding: 1px 6px;
-      border-radius: 999px;
-      border: 1px solid rgba(51, 65, 85, 0.9);
-      background: rgba(15, 23, 42, 0.9);
     }
 
-    .legend-swatch {
-      width: 10px;
-      height: 6px;
-      border-radius: 999px;
+    details.debug {
+      margin-top: 4px;
+      font-size: 11px;
     }
 
-    .swatch-same {
-      background: rgba(34, 197, 94, 0.45);
+    details.debug summary {
+      cursor: pointer;
+      color: var(--muted-text);
+      list-style: none;
     }
 
-    .swatch-partial {
-      background: rgba(234, 179, 8, 0.55);
+    .debug-text {
+      margin-top: 4px;
+      max-height: 160px;
+      overflow: auto;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.02);
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
     }
 
-    .swatch-diff {
-      background: rgba(248, 113, 113, 0.7);
+    .ocr-note {
+      font-size: 10px;
+      color: var(--muted-text);
+      margin-top: 2px;
+    }
+
+    .compare-section {
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 12px 14px 16px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border-color);
+    }
+
+    .compare-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .compare-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .compare-subtitle {
+      font-size: 11px;
+      color: var(--muted-text);
     }
 
     .table-container {
-      flex: 1;
-      border-radius: 10px;
-      border: 1px solid rgba(31, 41, 55, 0.9);
+      max-height: calc(100vh - 260px);
       overflow: auto;
-      background: radial-gradient(circle at top left, #020617, #020617 64%, #020617 100%);
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11px;
-      min-width: 720px;
+      table-layout: fixed;
+      font-size: 12px;
     }
 
     thead {
-      background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.98));
       position: sticky;
       top: 0;
-      z-index: 1;
-    }
-
-    th,
-    td {
-      border-bottom: 1px solid rgba(31, 41, 55, 0.95);
-      padding: 6px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    th {
-      font-weight: 500;
-      color: var(--text-soft);
-      position: sticky;
-      top: 0;
-      background: inherit;
       z-index: 2;
+      background: var(--table-header-bg);
     }
 
-    tr.section-same {
-      background: rgba(5, 46, 22, 0.35);
+    thead th {
+      padding: 8px 8px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+      font-weight: 600;
     }
 
-    tr.section-partial {
-      background: rgba(113, 63, 18, 0.35);
+    tbody tr:nth-child(odd) {
+      background: var(--table-row-alt);
     }
 
-    tr.section-different {
-      background: rgba(127, 29, 29, 0.45);
+    tbody td {
+      border-bottom: 1px solid var(--border-color);
+      padding: 6px 8px;
+      vertical-align: top;
+      max-width: 400px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
     }
 
-    .section-name-cell {
-      font-weight: 500;
-      width: 170px;
+    .section-col {
+      width: 160px;
     }
 
-    .ai-assist-cell {
-      width: 120px;
-      white-space: nowrap;
+    .key-diff-identical {
+      color: #2e7d32;
+      font-weight: 600;
     }
 
-    .settings-panel {
-      margin-top: 6px;
-      border-radius: 14px;
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      background: radial-gradient(circle at top left, #020617, #020617 64%, #020617 100%);
-      padding: 8px 10px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 11px;
+    .key-diff-similar {
+      color: #f9a825;
+      font-weight: 600;
     }
 
-    .settings-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
+    .key-diff-different {
+      color: #c62828;
+      font-weight: 600;
     }
 
-    .settings-label {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .key-diff-missing {
+      color: #6a1b9a;
+      font-weight: 600;
     }
 
-    .settings-label-title {
-      font-weight: 500;
+    .cell-unique {
+      background: var(--highlight-unique);
     }
 
-    .settings-label-help {
-      color: var(--text-soft);
-      max-width: 260px;
+    .not-specified {
+      font-style: italic;
+      color: var(--muted-text);
     }
 
-    .settings-control {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .scrollbar::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
     }
-
-    .select {
-      background: rgba(15, 23, 42, 0.9);
-      color: var(--text);
+    .scrollbar::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    .scrollbar::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
       border-radius: 999px;
-      border: 1px solid rgba(55, 65, 81, 0.9);
-      font-size: 11px;
-      padding: 4px 8px;
-    }
-
-    .footnote {
-      font-size: 10px;
-      color: var(--text-soft);
     }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="app-header">
-      <div class="app-header__left">
-        <div class="logo-pill">
-          <div class="logo-pill-inner">
-            <div class="logo-pill-icon"></div>
-          </div>
+  <div class="app-shell" id="app">
+    <header>
+      <div class="top-bar">
+        <div>
+          <h1>PI Comparator</h1>
+          <p class="subtitle">
+            Upload 2–3 package inserts (PDF/TXT), extract key sections locally, and compare side by side.
+          </p>
         </div>
-        <div class="app-title-block">
-          <div class="app-title">
-            PI Comparator
-            <span class="app-badge">v2.1 · English PI</span>
-          </div>
-          <div class="app-subtitle">
-            Compare 2–3 IV product inserts side by side · offline-friendly
-          </div>
-        </div>
-      </div>
-      <div class="app-header__right">
-        <div class="chip">
-          <span class="chip-dot"></span>
-          <span>Local browser tool · PDF + OCR ready</span>
+        <div class="top-actions">
+          <span class="pill" id="readySummary">0 files uploaded</span>
         </div>
       </div>
     </header>
 
-    <main class="app-main">
-      <!-- Left: Files & upload -->
-      <section class="panel" aria-label="PI files">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">PI Files</div>
-            <div class="panel-subtitle">Upload 2–3 English PIs (PDF or text)</div>
+    <main>
+      <section class="upload-section">
+        <div>
+          <div class="dropzone" id="dropzone" tabindex="0" aria-label="Upload 2 to 3 PDF or text files">
+            <input id="fileInput" type="file" accept=".pdf,.txt" multiple />
+            <div class="dropzone-title">Drop PDFs or TXT files here</div>
+            <div class="dropzone-desc">
+              or click to browse. Accepts 2–3 files, up to 20 MB total.
+            </div>
+            <div class="counter-row">
+              <span>Total size limit 20 MB</span>
+              <span class="counter-pill" id="fileCountPill">0 files uploaded</span>
+            </div>
+            <div class="hint-text">
+              Digital PIs compare best. Scanned leaflets can use optional English-only OCR (slower, always verify in original PI).
+            </div>
           </div>
-          <button id="clearAllButton" class="btn btn-ghost" type="button">
-            Clear all
-          </button>
         </div>
 
-        <div id="dropzone" class="dropzone">
-          <div class="dropzone-title">Drop PIs here or browse</div>
-          <div class="dropzone-subtitle">
-            PDF (text-based or scanned) and .txt files · <strong>English only</strong>
+        <div class="files-panel">
+          <div class="files-header">
+            <div>
+              <div class="files-header-title">Uploaded files</div>
+              <div class="compare-subtitle" id="compareHint">
+                Add at least 2 files to start comparison.
+              </div>
+            </div>
+            <button type="button" class="danger" id="clearAllBtn">Clear all files</button>
           </div>
-          <div class="dropzone-actions">
-            <button id="browseButton" class="btn btn-primary" type="button">
-              Add Files
-            </button>
-            <span style="font-size: 11px; color: var(--text-soft);">
-              Max 3 files · &lt; 20 MB total
-            </span>
+          <div class="files-list" id="filesList"></div>
+          <div class="empty-state" id="emptyState">
+            Drag and drop 2–3 package inserts (PDF or TXT).<br />
+            Digital PDFs with a text layer are parsed automatically.<br />
+            Scanned PDFs are detected and can optionally run slow English OCR per file.
           </div>
-          <input
-            id="fileInput"
-            class="file-input"
-            type="file"
-            accept=".pdf,.txt,.text"
-            multiple
-          />
-        </div>
-
-        <div id="fileList" class="file-list" aria-label="Uploaded PI files">
-          <!-- File cards rendered here -->
         </div>
       </section>
 
-      <!-- Right: Comparison + settings -->
-      <section class="panel" aria-label="Comparison">
-        <div class="panel-header">
+      <section class="compare-section">
+        <div class="compare-header">
           <div>
-            <div class="panel-title">Comparison</div>
-            <div class="panel-subtitle">
-              Indications · Dosage · Dilution · Compatibility · Safety · Storage
+            <div class="compare-title">Clinical section comparison</div>
+            <div class="compare-subtitle" id="compareStatusLabel">
+              Waiting for at least 2 Ready products.
             </div>
           </div>
-          <div style="display: flex; gap: 6px;">
-            <button id="processAllButton" class="btn btn-primary" type="button">
-              Process All Files
-            </button>
-            <button id="exportCsvButton" class="btn btn-ghost" type="button">
-              Export CSV
-            </button>
+          <div class="top-actions">
+            <button type="button" id="aiAssistBtn" disabled>AI assist comparison</button>
+            <button type="button" id="exportJsonBtn" disabled>Export JSON for AI</button>
+            <button type="button" class="primary" id="exportCsvBtn" disabled>Export CSV</button>
           </div>
         </div>
 
-        <div class="comparison-wrapper">
-          <div class="comparison-controls">
-            <div class="comparison-legend">
-              <span class="legend-pill">
-                <span class="legend-swatch swatch-same"></span> Same
-              </span>
-              <span class="legend-pill">
-                <span class="legend-swatch swatch-partial"></span> Partial / wording diff
-              </span>
-              <span class="legend-pill">
-                <span class="legend-swatch swatch-diff"></span> Different / missing
-              </span>
-            </div>
-            <span style="font-size: 11px; color: var(--text-soft);">
-              Hover cells for raw text
-            </span>
-          </div>
+        <div class="table-container scrollbar" id="tableContainer">
+          <table id="comparisonTable" aria-label="Package insert comparison table">
+            <thead>
+              <tr id="tableHeaderRow">
+                <th class="section-col">Section</th>
+                <th>Product 1</th>
+                <th>Product 2</th>
+                <th id="thirdProductHeader" style="display: none;">Product 3</th>
+                <th>Key Differences</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center; padding:16px; font-size:12px; color:var(--muted-text);">
+                  Comparison table will appear once at least 2 products are Ready.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <div id="comparisonTableContainer" class="table-container" aria-label="Comparison table">
-            <!-- Table rendered by JS -->
+      <!-- AI assist panel -->
+      <section class="compare-section" id="aiAssistPanel" style="margin-top: 12px; display:none;">
+        <div class="compare-header">
+          <div>
+            <div class="compare-title">AI-assisted clinical notes (placeholder)</div>
+            <div class="compare-subtitle" id="aiAssistStatus">
+              Click “AI assist comparison” to see how AI will interpret this comparison in the future.
+            </div>
           </div>
         </div>
-
-        <div class="settings-panel" aria-label="Settings">
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-label-title">AI Mode</span>
-              <span class="settings-label-help">
-                Choose how AI assistance runs on section text. Local keeps PI text on
-                this machine; API sends text to your configured endpoint.
-              </span>
-            </div>
-            <div class="settings-control">
-              <label for="aiModeSelect" style="font-size: 11px;">Mode</label>
-              <select id="aiModeSelect" class="select">
-                <option value="none">No AI (rules only)</option>
-                <option value="local">Local AI (browser / WebLLM)</option>
-                <option value="api">API AI (remote)</option>
-              </select>
-            </div>
-          </div>
-          <div class="footnote">
-            AI assistance is optional and configurable. This file includes only
-            <strong>hooks</strong> – you decide the local model or API endpoint.
-          </div>
-        </div>
+        <div id="aiNotesBody" style="font-size:12px; color:var(--text-color); white-space:pre-wrap;"></div>
       </section>
     </main>
-
-    <!-- JS will be added below in Part 2 + Part 3 -->
-    <script>
-      // JS PART 2 + PART 3 WILL BE INSERTED HERE
-    </script>
   </div>
-</body>
-</html>
-    <script>
-      // ------------------------------
-      // PI Comparator v2.1 – Core Logic (Part 2)
-      // ------------------------------
 
-      const state = {
-        files: [],
-        sections: [],
-        comparison: [],
-        settings: {
-          aiMode: 'none', // updated in Part 3
-        },
+  <script>
+    // ---------- State ----------
+    let uploadedFiles = [];
+    let parsedDocuments = {};
+    let comparisonData = [];
+    const processingStatus = {};
+    const progressValues = {};
+
+    const NOT_SPECIFIED = 'Not specified in uploaded document';
+
+    const sectionConfigs = [
+      { key: 'indications', name: 'Indications', headerPatterns: [/indications?/i, /therapeutic indications?/i], synonyms: ['indication', 'indications', 'uses', 'usage'] },
+      { key: 'dilutionMethod', name: 'Dilution Method', headerPatterns: [/method of reconstitution/i, /reconstitution/i, /dilution/i, /preparation of the solution/i], synonyms: ['dilution', 'reconstitution', 'preparation'] },
+      { key: 'compatibleDiluents', name: 'Compatible Diluents', headerPatterns: [/compatible diluents?/i, /diluents? compatible/i], synonyms: ['diluent', 'diluents', 'solvent', 'solvents'] },
+      { key: 'administration', name: 'Administration', headerPatterns: [/method of administration/i, /administration/i, /posology and method of administration/i], synonyms: ['administration', 'administer', 'infusion', 'injection', 'posology'] },
+      { key: 'contraindications', name: 'Contraindications', headerPatterns: [/contraindications?/i], synonyms: ['contraindication', 'not to be used', 'must not be used'] },
+      { key: 'cautionsWarnings', name: 'Warnings / Precautions', headerPatterns: [/warnings? and precautions?/i, /special warnings and precautions for use/i], synonyms: ['warning', 'warnings', 'precaution', 'precautions'] },
+      { key: 'ageLimitsDosage', name: 'Dosage / Age Limits', headerPatterns: [/posology/i, /dosage and administration/i, /dose and administration/i, /paediatric population/i, /geriatric population/i], synonyms: ['dosage', 'dose', 'posology', 'age limits', 'pediatric', 'paediatric', 'elderly'] },
+      { key: 'drugInteractions', name: 'Drug Interactions', headerPatterns: [/drug interactions?/i, /interaction with other medicinal products/i], synonyms: ['interaction', 'drug interaction'] },
+      { key: 'sideEffects', name: 'Side Effects', headerPatterns: [/adverse reactions?/i, /undesirable effects?/i, /side effects?/i], synonyms: ['adverse reaction', 'adverse event', 'side effect'] },
+      { key: 'storage', name: 'Storage Conditions', headerPatterns: [/storage/i, /special precautions for storage/i], synonyms: ['store', 'storage'] },
+      { key: 'shelfLife', name: 'Shelf Life', headerPatterns: [/shelf life/i], synonyms: ['expiry', 'expiration'] },
+      { key: 'reconstitutionStability', name: 'Reconstitution / Infusion Stability', headerPatterns: [/stability/i, /shelf life after reconstitution/i], synonyms: ['stability', 'reconstituted solution'] },
+      { key: 'containerStrength', name: 'Container / Strength / Pack', headerPatterns: [/pharmaceutical form/i, /presentation/i, /pack size/i], synonyms: ['vial', 'ampoule', 'strength', 'pack'] },
+      { key: 'additionalNotes', name: 'Additional Notes', headerPatterns: [/special precautions for disposal/i, /other information/i], synonyms: ['note', 'miscellaneous'] }
+    ];
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      const val = bytes / Math.pow(1024, i);
+      return `${val.toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+    }
+
+    function generateId() {
+      return 'f_' + Math.random().toString(36).slice(2, 9);
+    }
+
+    function getReadyFiles() {
+      return uploadedFiles.filter(f => f.status === 'Ready');
+    }
+
+    function updateFileCountDisplay() {
+      const countPill = document.getElementById('fileCountPill');
+      const readySummary = document.getElementById('readySummary');
+      const total = uploadedFiles.length;
+      countPill.textContent = `${total} files uploaded`;
+      readySummary.textContent = `${total} files uploaded`;
+
+      const readyCount = getReadyFiles().length;
+      if (readyCount >= 2) {
+        countPill.classList.add('ready');
+      } else {
+        countPill.classList.remove('ready');
+      }
+
+      const hint = document.getElementById('compareHint');
+      if (readyCount >= 2) {
+        hint.textContent = 'At least 2 products are Ready. Comparison below is updated automatically.';
+      } else {
+        hint.textContent = 'Add at least 2 files to start comparison.';
+      }
+    }
+
+    // ---------- File add / remove / clear ----------
+    function addFiles(fileList) {
+      const incoming = Array.from(fileList || []);
+      if (!incoming.length) return;
+
+      if (uploadedFiles.length >= 3) {
+        alert('A maximum of 3 files is allowed. Remove a file before adding another.');
+        return;
+      }
+
+      const existingSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+      const incomingSize = incoming.reduce((sum, f) => sum + (f.size || 0), 0);
+      const totalSize = existingSize + incomingSize;
+      if (totalSize > 20 * 1024 * 1024) {
+        alert('Total upload size cannot exceed 20 MB.');
+        return;
+      }
+
+      const availableSlots = 3 - uploadedFiles.length;
+      const filesToAdd = incoming.slice(0, availableSlots);
+
+      filesToAdd.forEach(file => {
+        const id = generateId();
+        const fileObj = {
+          id,
+          file,
+          name: file.name,
+          size: file.size,
+          status: 'Processing',
+          processingMode: 'text',
+          error: null,
+          progress: 0,
+          extractedText: ''
+        };
+        uploadedFiles.push(fileObj);
+        processingStatus[id] = 'Processing';
+        progressValues[id] = 0;
+        processFile(fileObj);
+      });
+
+      renderFileCards();
+      updateFileCountDisplay();
+    }
+
+    function removeFile(fileId) {
+      uploadedFiles = uploadedFiles.filter(f => f.id !== fileId);
+      delete parsedDocuments[fileId];
+      delete processingStatus[fileId];
+      delete progressValues[fileId];
+
+      if (uploadedFiles.length === 0) {
+        comparisonData = [];
+      } else {
+        compareSections(parsedDocuments);
+      }
+
+      renderFileCards();
+      renderComparisonTable();
+      updateFileCountDisplay();
+    }
+
+    function clearAllFiles() {
+      const ok = confirm('Clear all uploaded files and reset comparison?');
+      if (!ok) return;
+
+      uploadedFiles = [];
+      parsedDocuments = {};
+      comparisonData = [];
+      for (const key in processingStatus) delete processingStatus[key];
+      for (const key in progressValues) delete progressValues[key];
+
+      renderFileCards();
+      renderComparisonTable();
+      updateFileCountDisplay();
+
+      const panel = document.getElementById('aiAssistPanel');
+      panel.style.display = 'none';
+    }
+
+    // ---------- OCR English filter ----------
+    function filterToEnglishLines(text) {
+      if (!text) return '';
+      const lines = text.split(/\r?\n/);
+      const keep = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const latin = trimmed.match(/[A-Za-z]/g) || [];
+        const nonAscii = trimmed.match(/[^\x00-\x7F]/g) || [];
+        const total = latin.length + nonAscii.length;
+        if (total === 0) continue;
+        if (latin.length >= 8 && latin.length / total >= 0.7) {
+          keep.push(trimmed);
+        }
+      }
+      return keep.join('\n');
+    }
+
+    // ---------- Text extraction ----------
+    function extractTextFromTxt(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read text file.'));
+        reader.onload = () => resolve(reader.result);
+        reader.readAsText(file);
+      });
+    }
+
+    async function extractTextFromPdf(file, onProgress) {
+      if (!window.pdfjsLib) {
+        throw new Error('PDF.js not available in this browser.');
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+      const pdf = await loadingTask.promise;
+      const maxPages = Math.min(pdf.numPages, 10);
+      let combinedText = '';
+
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str || '');
+        combinedText += strings.join(' ') + '\n';
+        const progress = 10 + (pageNum / maxPages) * 60;
+        onProgress(progress);
+      }
+      return combinedText;
+    }
+
+    async function performOcrFallback(file, onProgress) {
+      if (!window.Tesseract) {
+        throw new Error('OCR not available – Tesseract.js missing.');
+      }
+      if (!window.pdfjsLib) {
+        throw new Error('PDF.js not available for OCR fallback.');
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+      const pdf = await loadingTask.promise;
+      const totalPages = Math.min(pdf.numPages, 5);
+      let extracted = '';
+
+      const worker = await Tesseract.createWorker({
+        logger: m => {
+          if (m.status === 'recognizing text' && m.progress != null) {
+            const globalProgress = 40 + (m.progress * 60);
+            onProgress(Math.min(100, Math.round(globalProgress)));
+          }
+        }
+      });
+
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+      await worker.setParameters({
+        tessedit_char_whitelist:
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-:;%()/+ '
+      });
+
+      try {
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: context, viewport }).promise;
+          const dataUrl = canvas.toDataURL('image/png');
+
+          const result = await worker.recognize(dataUrl);
+          extracted += result.data.text + '\n';
+          const overall = 40 + (pageNum / totalPages) * 60;
+          onProgress(Math.min(100, Math.round(overall)));
+        }
+      } finally {
+        await worker.terminate();
+      }
+
+      return extracted;
+    }
+
+    // ---------- Normalization & parsing ----------
+    function normalizeText(text) {
+      if (!text) return '';
+      let t = text;
+      t = t.replace(/\u00AD/g, '');
+      t = t.replace(/\r\n/g, '\n');
+      t = t.replace(/\s+/g, ' ');
+      t = t.trim();
+      return t;
+    }
+
+    function normalizeClinicalText(text) {
+      if (!text) return '';
+      let t = normalizeText(text).toLowerCase();
+      return t;
+    }
+
+    function canonicalizeFluidName(text) {
+      if (!text) return '';
+      const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
+      const nsPatterns = [
+        /normal saline/,
+        /0\.9\s*%?\s*saline/,
+        /sodium chloride/,
+        /nacl\s*0\.9/
+      ];
+      for (const re of nsPatterns) {
+        if (re.test(t)) return '0.9% sodium chloride for injection';
+      }
+      const wfiPatterns = [/water for injection/, /sterile water/];
+      for (const re of wfiPatterns) {
+        if (re.test(t)) return 'water for injection';
+      }
+      const d5Patterns = [/d5w?/, /dextrose 5/, /glucose 5/];
+      for (const re of d5Patterns) {
+        if (re.test(t)) return '5% dextrose';
+      }
+      return normalizeText(text).toLowerCase();
+    }
+
+    function extractCompatibleFluids(text) {
+      if (!text) return [];
+      const fluids = [];
+      const genericCandidates = [
+        '0.9% saline',
+        'normal saline',
+        'sodium chloride',
+        'nacl',
+        'wfi',
+        'water for injection',
+        'd5',
+        'd5w',
+        'dextrose 5',
+        'glucose 5'
+      ];
+      const lower = text.toLowerCase();
+      genericCandidates.forEach(term => {
+        const re = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        if (re.test(lower)) fluids.push(term);
+      });
+      const unique = Array.from(new Set(fluids.map(canonicalizeFluidName)));
+      return unique;
+    }
+
+    function findSectionMatches(text, sectionConfig) {
+      const blocks = [];
+      const normalizedText = text;
+      const headerRegexes = sectionConfig.headerPatterns || [];
+      const indices = [];
+
+      headerRegexes.forEach(re => {
+        let match;
+        const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+        while ((match = globalRe.exec(normalizedText)) !== null) {
+          indices.push({ index: match.index, length: match[0].length });
+        }
+      });
+
+      if (!indices.length) return blocks;
+      indices.sort((a, b) => a.index - b.index);
+
+      for (let i = 0; i < indices.length; i++) {
+        const start = indices[i].index + indices[i].length;
+        const end = i + 1 < indices.length ? indices[i + 1].index : normalizedText.length;
+        const segment = normalizedText.slice(start, end).trim();
+        if (segment) blocks.push(segment);
+      }
+
+      return blocks;
+    }
+
+    function parseSections(text) {
+      const rawSections = {};
+      const normalizedSections = {};
+      const cleanText = text;
+
+      sectionConfigs.forEach(section => {
+        let rawValue = '';
+        if (section.key === 'compatibleDiluents') {
+          const fluids = extractCompatibleFluids(cleanText);
+          rawValue = fluids.length ? fluids.join(', ') : '';
+        } else {
+          const matches = findSectionMatches(cleanText, section);
+          rawValue = matches && matches.length ? matches[0].slice(0, 600) : '';
+        }
+
+        if (!rawValue) {
+          rawSections[section.key] = NOT_SPECIFIED;
+          normalizedSections[section.key] = NOT_SPECIFIED;
+        } else {
+          if (section.key === 'compatibleDiluents') {
+            const fluids = extractCompatibleFluids(cleanText);
+            const canonicalList = Array.from(new Set(fluids.map(canonicalizeFluidName)));
+            const str = canonicalList.join(', ');
+            rawSections[section.key] = str || NOT_SPECIFIED;
+            normalizedSections[section.key] = str || NOT_SPECIFIED;
+          } else {
+            rawSections[section.key] = rawValue;
+            const normalized = normalizeClinicalText(rawValue.slice(0, 600));
+            normalizedSections[section.key] = normalized || NOT_SPECIFIED;
+          }
+        }
+      });
+
+      return { rawSections, normalizedSections };
+    }
+
+    // ---------- Comparison ----------
+    function compareNormalizedLists(values) {
+      const filtered = values.filter(v => v && v !== NOT_SPECIFIED);
+      if (!filtered.length) {
+        return { status: 'Missing', identical: true, similar: false };
+      }
+
+      const sets = filtered.map(v =>
+        Array.from(
+          new Set(
+            v
+              .split(',')
+              .map(x => canonicalizeFluidName(x.trim()))
+              .filter(Boolean)
+          )
+        ).sort()
+      );
+
+      const allMissing = values.every(v => !v || v === NOT_SPECIFIED);
+      if (allMissing) return { status: 'Missing', identical: true, similar: false };
+
+      const first = sets[0].join(',');
+      const identical = sets.every(s => s.join(',') === first);
+      if (identical) {
+        return { status: allMissing ? 'Missing' : 'Identical', identical: true, similar: false };
+      }
+
+      const base = sets[0];
+      const cores = sets.map(s => s.filter(x => base.includes(x)));
+      const overlaps = cores.every(c => c.length > 0);
+      const extras = sets.some(s => s.some(x => !base.includes(x)));
+      if (overlaps && extras) {
+        return { status: 'Similar', identical: false, similar: true };
+      }
+
+      return { status: allMissing ? 'Missing' : 'Different', identical: false, similar: false };
+    }
+
+    function classifyDifference(values, sectionKey) {
+      const normalizedValues = values.map(v => {
+        if (!v) return '';
+        if (v === NOT_SPECIFIED) return NOT_SPECIFIED;
+        return normalizeClinicalText(v);
+      });
+
+      const allMissing = normalizedValues.every(v => v === NOT_SPECIFIED || !v);
+      if (allMissing) return 'Missing';
+
+      // SPECIAL CASE: contraindications "hypersensitivity only" → treat as identical
+      if (sectionKey === 'contraindications') {
+        const cleaned = normalizedValues.map(v => {
+          if (!v || v === NOT_SPECIFIED) return '';
+          return v
+            .replace(/patients?/g, '')
+            .replace(/known/g, '')
+            .replace(/history of/g, '')
+            .replace(/to this medicinal product/g, '')
+            .replace(/to the active substance.*$/g, '')
+            .replace(/to any of the excipients.*$/g, '')
+            .trim();
+        });
+
+        const onlyHypersensitivity = cleaned.every(v =>
+          v &&
+          /hypersensitiv|allerg/i.test(v) &&
+          !/severe|acute|chf|shock|respiratory|renal|hepatic|glaucoma|myasthenia|pregnan|breast\-?feeding|coma|depression|obstruction|contraindicated with/i.test(v)
+        );
+
+        if (onlyHypersensitivity) {
+          return 'Identical';
+        }
+      }
+
+      const first = normalizedValues[0];
+      const allEqual = normalizedValues.every(v => v === first);
+      if (allEqual) return 'Identical';
+
+      if (sectionKey === 'compatibleDiluents') {
+        const result = compareNormalizedLists(values);
+        return result.status;
+      }
+
+      const len = normalizedValues.length;
+      let overlapCount = 0;
+      for (let i = 0; i < len; i++) {
+        for (let j = i + 1; j < len; j++) {
+          const a = normalizedValues[i];
+          const b = normalizedValues[j];
+          if (!a || !b || a === NOT_SPECIFIED || b === NOT_SPECIFIED) continue;
+          const short = a.length < b.length ? a : b;
+          const long = a.length < b.length ? b : a;
+          if (short.length < 40) continue;
+          if (long.includes(short.slice(0, Math.floor(short.length * 0.7)))) {
+            overlapCount++;
+          }
+        }
+      }
+
+      if (overlapCount >= 1) return 'Similar';
+      return 'Different';
+    }
+
+    function compareSections(parsedDocs) {
+      const readyFiles = getReadyFiles();
+      if (readyFiles.length < 2) {
+        comparisonData = [];
+        return;
+      }
+      const fileIds = readyFiles.map(f => f.id);
+      const rows = [];
+
+      sectionConfigs.forEach(section => {
+        const values = fileIds.map(id => {
+          const doc = parsedDocs[id];
+          if (!doc) return NOT_SPECIFIED;
+          const v = doc.rawSections[section.key];
+          return v || NOT_SPECIFIED;
+        });
+        const keyDiff = classifyDifference(values, section.key);
+        rows.push({ section: section.name, key: section.key, values, keyDifference: keyDiff });
+      });
+
+      comparisonData = rows;
+    }
+
+    // ---------- CSV ----------
+    function escapeCsvValue(value) {
+      if (value == null) return '""';
+      let v = String(value);
+      v = v.replace(/"/g, '""');
+      return `"${v}"`;
+    }
+
+    function exportComparisonCsv() {
+      if (!comparisonData.length) return;
+      const readyFiles = getReadyFiles();
+      const cols = ['Section'];
+      readyFiles.forEach((f, idx) => {
+        const modeLabel = f.processingMode === 'ocr' ? ' (OCR)' : '';
+        cols.push(`Product ${idx + 1}: ${f.name}${modeLabel}`);
+      });
+      cols.push('Key Differences');
+
+      const lines = [];
+      lines.push(cols.map(escapeCsvValue).join(','));
+
+      comparisonData.forEach(row => {
+        const base = [row.section];
+        base.push(...row.values.slice(0, readyFiles.length));
+        base.push(row.keyDifference);
+        lines.push(base.map(escapeCsvValue).join(','));
+      });
+
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pi_comparison.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- JSON for future AI ----------
+    function buildAiComparisonPayload() {
+      const readyFiles = getReadyFiles();
+      if (readyFiles.length < 2 || !comparisonData.length) return null;
+
+      const products = readyFiles.map(f => {
+        const doc = parsedDocuments[f.id];
+        return {
+          name: f.name,
+          sections: doc ? doc.rawSections : {}
+        };
+      });
+
+      const comparison = comparisonData.map(row => ({
+        section: row.section,
+        key: row.key,
+        status: row.keyDifference
+      }));
+
+      return { products, comparison };
+    }
+
+    function exportComparisonJsonForAi() {
+      const payload = buildAiComparisonPayload();
+      if (!payload) return;
+
+      const blob = new Blob(
+        [JSON.stringify(payload, null, 2)],
+        { type: 'application/json;charset=utf-8;' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pi_comparison_for_ai.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- AI assist placeholder ----------
+    function showAiAssistPlaceholder() {
+      const payload = buildAiComparisonPayload();
+      if (!payload) return;
+
+      const panel = document.getElementById('aiAssistPanel');
+      const statusEl = document.getElementById('aiAssistStatus');
+      const bodyEl = document.getElementById('aiNotesBody');
+
+      panel.style.display = 'block';
+      statusEl.textContent =
+        'Placeholder: In the future, this panel will show AI-generated clinical interpretations based on the JSON payload below.';
+
+      let text = '';
+      text += 'Current AI payload (excerpt):\n';
+      text += '- Products: ' + payload.products.length + '\n';
+      payload.products.forEach((p, idx) => {
+        text += '  • Product ' + (idx + 1) + ': ' + p.name + '\n';
+      });
+      text += '- Sections compared: ' + payload.comparison.length + '\n\n';
+      text += 'Example comparison statuses:\n';
+      payload.comparison.slice(0, 8).forEach(c => {
+        text += '  • ' + c.section + ': ' + c.status + '\n';
+      });
+      text += '\nTo use a backend later, this payload would be POSTed to /api/interpret-comparison and the response (section_notes + overall_summary) rendered here.';
+
+      bodyEl.textContent = text;
+    }
+
+    // ---------- Rendering ----------
+    function renderFileCards() {
+      const list = document.getElementById('filesList');
+      const empty = document.getElementById('emptyState');
+      list.innerHTML = '';
+      if (!uploadedFiles.length) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      uploadedFiles.forEach((fObj, index) => {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+
+        const main = document.createElement('div');
+        main.className = 'file-main';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'file-title-row';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'file-name';
+        nameEl.textContent = fObj.name || `Product ${index + 1}`;
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'file-meta';
+        const modeLabel =
+          fObj.processingMode === 'ocr' ? ' • OCR' :
+          fObj.processingMode === 'text' ? ' • Text' : '';
+        metaEl.textContent = `${formatBytes(fObj.size)} • Product ${index + 1}${modeLabel}`;
+
+        titleRow.appendChild(nameEl);
+
+        const statusBadge = document.createElement('span');
+        statusBadge.className = 'status-badge';
+        const badgeDot = document.createElement('span');
+        badgeDot.className = 'badge-dot';
+        const statusText = document.createElement('span');
+
+        if (fObj.status === 'Processing') {
+          statusBadge.classList.add('status-processing');
+          const spinner = document.createElement('span');
+          spinner.className = 'spinner';
+          statusBadge.appendChild(spinner);
+          statusText.textContent = 'Processing';
+        } else if (fObj.status === 'Ready') {
+          if (fObj.processingMode === 'ocr') {
+            statusBadge.classList.add('status-ocr');
+          } else {
+            statusBadge.classList.add('status-ready');
+          }
+          statusBadge.appendChild(badgeDot);
+          statusText.textContent = fObj.processingMode === 'ocr' ? 'Ready (OCR)' : 'Ready';
+        } else {
+          statusBadge.classList.add('status-error');
+          statusBadge.appendChild(badgeDot);
+          statusText.textContent = 'Error';
+        }
+        statusBadge.appendChild(statusText);
+
+        titleRow.appendChild(statusBadge);
+        main.appendChild(titleRow);
+        main.appendChild(metaEl);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        const fill = document.createElement('div');
+        fill.className = 'progress-fill';
+        fill.style.width = fObj.progress + '%';
+        progressBar.appendChild(fill);
+        main.appendChild(progressBar);
+
+        if (fObj.error && fObj.status === 'Error') {
+          const err = document.createElement('div');
+          err.className = 'file-meta';
+          err.style.color = 'var(--danger)';
+          err.textContent = fObj.error;
+          main.appendChild(err);
+
+          if (/Scanned PDF detected/i.test(fObj.error)) {
+            const note = document.createElement('div');
+            note.className = 'ocr-note';
+            note.textContent = 'Scanned insert – run English-only OCR if needed.';
+            main.appendChild(note);
+          }
+        }
+
+        const details = document.createElement('details');
+        details.className = 'debug';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Show extracted text';
+        const pre = document.createElement('div');
+        pre.className = 'debug-text scrollbar';
+        pre.textContent = fObj.extractedText
+          ? fObj.extractedText.slice(0, 5000)
+          : 'No text extracted yet.';
+        details.appendChild(summary);
+        details.appendChild(pre);
+        main.appendChild(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'file-actions';
+
+        if (fObj.status === 'Error' && /Scanned PDF detected/i.test(fObj.error)) {
+          const ocrBtn = document.createElement('button');
+          ocrBtn.type = 'button';
+          ocrBtn.textContent = 'Run OCR (English, slow)';
+          ocrBtn.addEventListener('click', () => runOcrForFile(fObj.id));
+          actions.appendChild(ocrBtn);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => removeFile(fObj.id));
+        actions.appendChild(removeBtn);
+
+        card.appendChild(main);
+        card.appendChild(actions);
+        list.appendChild(card);
+      });
+
+      const readyFiles = getReadyFiles();
+      const exportBtn = document.getElementById('exportCsvBtn');
+      exportBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      const exportJsonBtn = document.getElementById('exportJsonBtn');
+      if (exportJsonBtn) {
+        exportJsonBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+      const aiAssistBtn = document.getElementById('aiAssistBtn');
+      if (aiAssistBtn) {
+        aiAssistBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+    }
+
+    function renderComparisonTable() {
+      const tbody = document.getElementById('comparisonTableBody');
+      const thirdHeader = document.getElementById('thirdProductHeader');
+      tbody.innerHTML = '';
+      const readyFiles = getReadyFiles();
+      const colCount = readyFiles.length;
+
+      if (colCount < 2 || !comparisonData.length) {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.style.textAlign = 'center';
+        td.style.padding = '16px';
+        td.style.fontSize = '12px';
+        td.style.color = 'var(--muted-text)';
+        td.textContent = 'Comparison table will appear once at least 2 products are Ready.';
+        row.appendChild(td);
+        tbody.appendChild(row);
+        thirdHeader.style.display = 'none';
+        const exportBtn = document.getElementById('exportCsvBtn');
+        exportBtn.disabled = true;
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        if (exportJsonBtn) exportJsonBtn.disabled = true;
+        const aiAssistBtn = document.getElementById('aiAssistBtn');
+        if (aiAssistBtn) aiAssistBtn.disabled = true;
+        return;
+      }
+
+      if (colCount === 3) {
+        thirdHeader.style.display = '';
+        thirdHeader.textContent = 'Product 3';
+      } else {
+        thirdHeader.style.display = 'none';
+      }
+
+      comparisonData.forEach(row => {
+        const tr = document.createElement('tr');
+        const sectionTd = document.createElement('td');
+        sectionTd.className = 'section-col';
+        sectionTd.textContent = row.section;
+        tr.appendChild(sectionTd);
+
+        const valuesToRender = row.values.slice(0, colCount);
+        let base = '';
+        if (row.key === 'compatibleDiluents') {
+          base = valuesToRender[0] || '';
+        } else {
+          base = normalizeClinicalText(valuesToRender[0] || '');
+        }
+
+        valuesToRender.forEach(val => {
+          const td = document.createElement('td');
+          if (!val || val === NOT_SPECIFIED) {
+            td.textContent = NOT_SPECIFIED;
+            td.classList.add('not-specified');
+          } else {
+            td.textContent = val;
+            if (row.keyDifference === 'Different' && val && val !== NOT_SPECIFIED) {
+              if (row.key === 'compatibleDiluents') {
+                const canonBase = canonicalizeFluidName(base);
+                const canonVal = canonicalizeFluidName(val);
+                if (canonVal !== canonBase) {
+                  td.classList.add('cell-unique');
+                }
+              } else {
+                const n = normalizeClinicalText(val);
+                if (n !== base) {
+                  td.classList.add('cell-unique');
+                }
+              }
+            }
+          }
+          tr.appendChild(td);
+        });
+
+        if (colCount === 2) {
+          const emptyTd = document.createElement('td');
+          emptyTd.style.display = 'none';
+          tr.appendChild(emptyTd);
+        }
+
+        const diffTd = document.createElement('td');
+        if (row.keyDifference === 'Identical') diffTd.className = 'key-diff-identical';
+        else if (row.keyDifference === 'Similar') diffTd.className = 'key-diff-similar';
+        else if (row.keyDifference === 'Different') diffTd.className = 'key-diff-different';
+        else if (row.keyDifference === 'Missing') diffTd.className = 'key-diff-missing';
+        diffTd.textContent = row.keyDifference;
+        tr.appendChild(diffTd);
+
+        tbody.appendChild(tr);
+      });
+
+      const exportBtn = document.getElementById('exportCsvBtn');
+      exportBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      const exportJsonBtn = document.getElementById('exportJsonBtn');
+      if (exportJsonBtn) {
+        exportJsonBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+      const aiAssistBtn = document.getElementById('aiAssistBtn');
+      if (aiAssistBtn) {
+        aiAssistBtn.disabled = !(readyFiles.length >= 2 && comparisonData.length);
+      }
+    }
+
+    // ---------- Core processing ----------
+    async function processFile(fileObj) {
+      const file = fileObj.file;
+      const id = fileObj.id;
+      fileObj.status = 'Processing';
+      fileObj.error = null;
+      fileObj.progress = 0;
+      renderFileCards();
+
+      const onProgress = p => {
+        const v = Math.max(0, Math.min(100, Math.round(p)));
+        fileObj.progress = v;
+        progressValues[id] = v;
+        renderFileCards();
       };
 
-      // ------------------------------
-      // Section configuration – English PI headings
-      // ------------------------------
+      let text = '';
+      let usedOcr = false;
 
-      const sectionConfigs = [
-        {
-          id: 'indications',
-          name: 'Indications',
-          keywords: [
-            'indications and clinical use',
-            'indications',
-            'therapeutic indications',
-            'uses'
-          ],
-          synonyms: ['clinical use', 'approved indications', 'intended use']
-        },
-        {
-          id: 'dosage_admin',
-          name: 'Dosage and Administration',
-          keywords: [
-            'dosage and administration',
-            'recommended dose',
-            'posology',
-            'administration',
-            'adult dosage',
-            'paediatric dosage',
-            'pediatric dosage'
-          ],
-          synonyms: ['dose', 'dosage', 'how to take', 'how to use', 'infusion rate']
-        },
-        {
-          id: 'dilution_reconstitution',
-          name: 'Dilution / Reconstitution',
-          keywords: [
-            'dilution',
-            'reconstitution',
-            'reconstitute',
-            'preparation for administration',
-            'preparation'
-          ],
-          synonyms: ['dilute', 'reconstituted solution', 'reconstituted']
-        },
-        {
-          id: 'compatibility',
-          name: 'Compatible Diluents (NS, D5W, others)',
-          keywords: [
-            'compatibility',
-            'compatible diluents',
-            'compatible solutions',
-            'compatibility and stability',
-            'diluents'
-          ],
-          synonyms: ['normal saline', 'sodium chloride', 'ns', 'dextrose 5%', 'd5w', 'lactated ringer']
-        },
-        {
-          id: 'contraindications',
-          name: 'Contraindications',
-          keywords: [
-            'contraindications',
-            'who should not receive',
-            'contra-indications'
-          ],
-          synonyms: ['must not be used', 'do not use in', 'is contraindicated']
-        },
-        {
-          id: 'warnings_precautions',
-          name: 'Warnings and Precautions',
-          keywords: [
-            'warnings and precautions',
-            'warnings',
-            'special warnings and precautions for use',
-            'precautions'
-          ],
-          synonyms: ['monitoring', 'risk factors', 'special warnings']
-        },
-        {
-          id: 'cautions_special',
-          name: 'Cautions / Special Populations',
-          keywords: [
-            'special populations',
-            'use in specific populations',
-            'use in elderly',
-            'use in paediatric',
-            'use in pediatric',
-            'pregnancy and lactation'
-          ],
-          synonyms: ['renal impairment', 'hepatic impairment', 'pregnancy', 'breast-feeding', 'breastfeeding']
-        },
-        {
-          id: 'side_effects',
-          name: 'Side Effects / Adverse Reactions',
-          keywords: [
-            'adverse reactions',
-            'adverse effects',
-            'side effects',
-            'undesirable effects'
-          ],
-          synonyms: ['safety profile', 'post-marketing experience', 'postmarketing experience']
-        },
-        {
-          id: 'interactions',
-          name: 'Drug Interactions',
-          keywords: [
-            'drug interactions',
-            'interactions',
-            'interactions with other medicinal products',
-            'drug-drug interactions'
-          ],
-          synonyms: ['interaction', 'concomitant use', 'co-administration', 'coadministration']
-        },
-        {
-          id: 'storage',
-          name: 'Storage and Stability',
-          keywords: [
-            'storage and stability',
-            'storage',
-            'stability',
-            'shelf life',
-            'how to store'
-          ],
-          synonyms: [
-            'store at',
-            'refrigerate',
-            'room temperature',
-            'shelf-life',
-            'expiry',
-            'expiration'
-          ]
-        }
-      ];
-
-      // ------------------------------
-      // Utilities
-      // ------------------------------
-
-      function createId() {
-        return 'f_' + Math.random().toString(36).slice(2, 10);
-      }
-
-      function humanFileSize(bytes) {
-        if (!bytes && bytes !== 0) return '';
-        const thresh = 1024;
-        if (Math.abs(bytes) < thresh) {
-          return bytes + ' B';
-        }
-        const units = ['KB', 'MB', 'GB'];
-        let u = -1;
-        do {
-          bytes /= thresh;
-          ++u;
-        } while (Math.abs(bytes) >= thresh && u < units.length - 1);
-        return bytes.toFixed(1) + ' ' + units[u];
-      }
-
-      function normaliseWhitespace(text) {
-        return (text || '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .replace(/[ \t]+/g, ' ')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim();
-      }
-
-      function collapseSpacedLetters(text) {
-        if (!text) return '';
-        return text.replace(/\b([A-Z])(?:\s([A-Z])){2,}\b/g, (match) => {
-          const letters = match.split(/\s+/);
-          const word = letters.join('');
-          if (word.length <= 2) return match;
-          return word;
-        });
-      }
-
-      function cleanOcrText(text) {
-        let out = text || '';
-        out = collapseSpacedLetters(out);
-        out = out.replace(/\b(\w+)(\s+\1\b)+/gi, '$1');
-        out = normaliseWhitespace(out);
-        return out;
-      }
-
-      function isPdfFile(file) {
-        return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-      }
-
-      // ------------------------------
-      // File management
-      // ------------------------------
-
-      function addFiles(fileList) {
-        const incoming = Array.from(fileList || []);
-        for (const file of incoming) {
-          if (state.files.length >= 3) break;
-          const id = createId();
-          state.files.push({
-            id,
-            file,
-            name: file.name,
-            size: file.size,
-            type: file.type || '',
-            status: 'pending', // pending | extracting | parsed | error
-            error: '',
-            rawText: '',
-            sections: {}
-          });
-        }
-        render();
-      }
-
-      function clearAllFiles() {
-        state.files = [];
-        state.comparison = [];
-        render();
-      }
-
-      // ------------------------------
-      // Text extraction (PDF.js + simple OCR stub)
-      // ------------------------------
-
-      async function extractTextFromPdf(file) {
-        if (!window.pdfjsLib) {
-          throw new Error('pdfjsLib not loaded');
-        }
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item) => item.str || '').join(' ');
-          fullText += '\n' + pageText;
-        }
-        return normaliseWhitespace(fullText);
-      }
-
-      async function extractTextFromTxt(file) {
-        const text = await file.text();
-        return normaliseWhitespace(text);
-      }
-
-      async function runOcrFallback(file) {
-        // Placeholder only. Real OCR wiring can be added later via Tesseract.js.
-        console.warn('OCR fallback not wired yet – returning empty string.');
-        return '';
-      }
-
-      async function extractTextForFile(doc) {
-        const file = doc.file;
-        if (isPdfFile(file)) {
-          try {
-            let text = await extractTextFromPdf(file);
-            if (!text || text.length < 200) {
-              const ocrText = await runOcrFallback(file);
-              text = cleanOcrText(ocrText || text);
-            }
-            return text;
-          } catch (err) {
-            console.error('PDF extraction failed, trying OCR fallback', err);
-            const ocrText = await runOcrFallback(file);
-            return cleanOcrText(ocrText || '');
+      try {
+        if (file.name.toLowerCase().endsWith('.txt')) {
+          text = await extractTextFromTxt(file);
+          onProgress(80);
+        } else if (file.name.toLowerCase().endsWith('.pdf')) {
+          text = await extractTextFromPdf(file, onProgress);
+          const textChars = (text || '').replace(/\s+/g, '').length;
+          if (textChars < 200) {
+            throw new Error(
+              'Scanned PDF detected – no text layer. Use OCR to attempt parsing (slower).'
+            );
           }
         } else {
-          return await extractTextFromTxt(file);
-        }
-      }
-
-      // ------------------------------
-      // Section parsing
-      // ------------------------------
-
-      function findSectionBounds(text, patterns) {
-        const lower = text.toLowerCase();
-        const hits = [];
-
-        for (const cfg of patterns) {
-          const allTerms = [...(cfg.keywords || []), ...(cfg.synonyms || [])];
-          for (const term of allTerms) {
-            const idx = lower.indexOf(term.toLowerCase());
-            if (idx !== -1) {
-              hits.push({ id: cfg.id, index: idx });
-              break;
-            }
-          }
+          throw new Error('Unsupported file type.');
         }
 
-        hits.sort((a, b) => a.index - b.index);
-
-        const result = {};
-        for (let i = 0; i < hits.length; i++) {
-          const cur = hits[i];
-          const next = hits[i + 1];
-          const start = cur.index;
-          const end = next ? next.index : text.length;
-          result[cur.id] = text.slice(start, end).trim();
-        }
-        return result;
-      }
-
-      function parseSectionsFromText(text) {
-        const cleaned = normaliseWhitespace(text);
-        const bounds = findSectionBounds(cleaned, sectionConfigs);
-        const sections = {};
-        for (const cfg of sectionConfigs) {
-          const raw = bounds[cfg.id] || '';
-          sections[cfg.id] = {
-            id: cfg.id,
-            name: cfg.name,
-            raw: raw,
-            summary: raw ? raw.slice(0, 400) + (raw.length > 400 ? ' …' : '') : ''
-          };
-        }
-        return sections;
-      }
-
-      // ------------------------------
-      // Comparison building
-      // ------------------------------
-
-      function classifyDifference(cellTexts) {
-        const nonEmpty = cellTexts.filter((t) => !!t && t.trim().length > 0);
-        if (nonEmpty.length <= 1) return 'same';
-        const norm = nonEmpty.map((t) =>
-          t.toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9%/().,+-]+/g, ' ').trim()
-        );
-        const unique = Array.from(new Set(norm));
-        if (unique.length === 1) return 'same';
-        if (unique.length === 2) return 'partial';
-        return 'different';
-      }
-
-      function buildComparison() {
-        const rows = [];
-        const files = state.files;
-        if (!files.length) {
-          state.comparison = [];
-          return;
+        text = filterToEnglishLines(text);
+        const minChars = usedOcr ? 30 : 50;
+        if (!text || text.replace(/\s+/g, '').length < minChars) {
+          throw new Error('Unable to extract meaningful text.');
         }
 
-        for (const cfg of sectionConfigs) {
-          const row = {
-            id: cfg.id,
-            name: cfg.name,
-            cells: [],
-            status: 'same'
-          };
-          const cellTexts = [];
-          for (const doc of files) {
-            const sec = (doc.sections && doc.sections[cfg.id]) || null;
-            const txt = sec && sec.raw ? sec.raw : '';
-            cellTexts.push(txt);
-            row.cells.push({
-              text: txt,
-              summary: sec ? sec.summary : '',
-              missing: !txt
-            });
-          }
-          row.status = classifyDifference(cellTexts);
-          rows.push(row);
+        fileObj.extractedText = text;
+        const sections = parseSections(text);
+        parsedDocuments[id] = sections;
+        processingStatus[id] = 'Ready';
+        fileObj.status = 'Ready';
+        fileObj.processingMode = usedOcr ? 'ocr' : 'text';
+        fileObj.error = null;
+        onProgress(100);
+      } catch (err) {
+        console.error('Error processing file', file.name, err);
+        const msg = (err && err.message) ? err.message : 'Unknown error during parsing.';
+        if (/Scanned PDF detected/i.test(msg)) {
+          processingStatus[id] = 'Scanned';
+          fileObj.status = 'Error';
+          fileObj.processingMode = 'none';
+          fileObj.error = msg;
+        } else {
+          processingStatus[id] = 'Error';
+          fileObj.status = 'Error';
+          fileObj.processingMode = 'none';
+          fileObj.error = msg || 'Unknown error during parsing.';
         }
-        state.comparison = rows;
-      }
-
-      // ------------------------------
-      // Rendering – file list & table
-      // ------------------------------
-
-      function renderFileCards() {
-        const container = document.getElementById('fileList');
-        container.innerHTML = '';
-
-        if (!state.files.length) {
-          const empty = document.createElement('div');
-          empty.style.fontSize = '11px';
-          empty.style.color = 'var(--text-soft)';
-          empty.style.padding = '4px 4px 2px';
-          empty.textContent =
-            'No files yet. Add 2–3 English PIs (PDF or text) to start comparison.';
-          container.appendChild(empty);
-          return;
-        }
-
-        for (const doc of state.files) {
-          const card = document.createElement('div');
-          card.className = 'file-card';
-
-          const main = document.createElement('div');
-          main.className = 'file-card-main';
-
-          const title = document.createElement('div');
-          title.className = 'file-name';
-          title.textContent = doc.name;
-
-          const meta = document.createElement('div');
-          meta.className = 'file-meta';
-          const size = document.createElement('span');
-          size.textContent = humanFileSize(doc.size);
-          meta.appendChild(size);
-
-          const status = document.createElement('div');
-          status.className = 'status-chip';
-          const dot = document.createElement('span');
-          dot.className = 'status-dot';
-
-          if (doc.status === 'parsed') {
-            dot.classList.add('status-dot--ok');
-          } else if (doc.status === 'error') {
-            dot.classList.add('status-dot--err');
-          } else if (doc.status === 'extracting') {
-            dot.classList.add('status-dot--warn');
-          }
-
-          const label = document.createElement('span');
-          if (doc.status === 'pending') label.textContent = 'Pending';
-          else if (doc.status === 'extracting') label.textContent = 'Extracting…';
-          else if (doc.status === 'parsed') label.textContent = 'Parsed';
-          else label.textContent = 'Error';
-
-          status.appendChild(dot);
-          status.appendChild(label);
-
-          main.appendChild(title);
-          main.appendChild(meta);
-          main.appendChild(status);
-
-          const actions = document.createElement('div');
-          actions.className = 'file-card-actions';
-
-          const showTextBtn = document.createElement('button');
-          showTextBtn.type = 'button';
-          showTextBtn.className = 'link-button';
-          showTextBtn.textContent = 'Show extracted text';
-          showTextBtn.disabled = !doc.rawText;
-          showTextBtn.addEventListener('click', () => {
-            if (!doc.rawText) return;
-            const win = window.open('', '_blank');
-            if (win) {
-              win.document.write('<pre style="white-space: pre-wrap; font-family: system-ui, sans-serif; font-size: 12px;">');
-              win.document.write(
-                doc.rawText
-                  .replace(/&/g, '&amp;')
-                  .replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;')
-              );
-              win.document.write('</pre>');
-              win.document.close();
-            }
-          });
-
-          actions.appendChild(showTextBtn);
-          card.appendChild(main);
-          card.appendChild(actions);
-          container.appendChild(card);
-        }
-      }
-
-      function renderComparisonTable() {
-        const container = document.getElementById('comparisonTableContainer');
-        container.innerHTML = '';
-
-        if (!state.files.length) {
-          const empty = document.createElement('div');
-          empty.style.fontSize = '11px';
-          empty.style.color = 'var(--text-soft)';
-          empty.style.padding = '4px 6px';
-          empty.textContent = 'Add 2–3 PIs on the left to see section-by-section comparison here.';
-          container.appendChild(empty);
-          return;
-        }
-
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-
-        const thSection = document.createElement('th');
-        thSection.className = 'section-name-cell';
-        thSection.textContent = 'Section';
-        headerRow.appendChild(thSection);
-
-        for (const doc of state.files) {
-          const th = document.createElement('th');
-          th.textContent = doc.name;
-          headerRow.appendChild(th);
-        }
-
-        const thAi = document.createElement('th');
-        thAi.className = 'ai-assist-cell';
-        thAi.textContent = 'AI assist';
-        headerRow.appendChild(thAi);
-
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-
-        for (const row of state.comparison) {
-          const tr = document.createElement('tr');
-          if (row.status === 'same') tr.className = 'section-same';
-          else if (row.status === 'partial') tr.className = 'section-partial';
-          else if (row.status === 'different') tr.className = 'section-different';
-
-          const tdName = document.createElement('td');
-          tdName.className = 'section-name-cell';
-          tdName.textContent = row.name;
-          tbody.appendChild(tr);
-          tr.appendChild(tdName);
-
-          row.cells.forEach((cell) => {
-            const td = document.createElement('td');
-            const summary = cell.summary || (cell.text ? cell.text.slice(0, 160) : '');
-            td.textContent = summary || '—';
-            if (cell.text) {
-              td.title = cell.text;
-            } else {
-              td.style.color = 'var(--text-soft)';
-            }
-            tr.appendChild(td);
-          });
-
-          const tdAi = document.createElement('td');
-          tdAi.className = 'ai-assist-cell';
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'btn btn-ghost';
-          btn.style.fontSize = '10px';
-          btn.textContent = 'Ask AI about this section';
-          btn.dataset.sectionId = row.id;
-          btn.addEventListener('click', () => {
-            handleAiAssistClick(row.id);
-          });
-          tdAi.appendChild(btn);
-          tr.appendChild(tdAi);
-        }
-
-        table.appendChild(tbody);
-        container.appendChild(table);
-      }
-
-      function render() {
+        fileObj.progress = 100;
+        progressValues[id] = 100;
+      } finally {
         renderFileCards();
-        buildComparison();
+        const readyFiles = getReadyFiles();
+        if (readyFiles.length >= 2) {
+          compareSections(parsedDocuments);
+        }
+        renderComparisonTable();
+        const statusLabel = document.getElementById('compareStatusLabel');
+        const readyCount = getReadyFiles().length;
+        statusLabel.textContent =
+          readyCount >= 2
+            ? `Comparison based on ${readyCount} Ready products.`
+            : 'Waiting for at least 2 Ready products.';
+      }
+    }
+
+    async function runOcrForFile(fileId) {
+      const fileObj = uploadedFiles.find(f => f.id === fileId);
+      if (!fileObj) return;
+
+      const file = fileObj.file;
+      fileObj.status = 'Processing';
+      fileObj.error = null;
+      fileObj.progress = 0;
+      fileObj.processingMode = 'ocr';
+      renderFileCards();
+
+      const onProgress = p => {
+        const v = Math.max(0, Math.min(100, Math.round(p)));
+        fileObj.progress = v;
+        progressValues[fileId] = v;
+        renderFileCards();
+      };
+
+      let text = '';
+      try {
+        text = await performOcrFallback(file, onProgress);
+        text = filterToEnglishLines(text);
+        const minChars = 30;
+        if (!text || text.replace(/\s+/g, '').length < minChars) {
+          throw new Error('OCR result too limited for reliable parsing.');
+        }
+        fileObj.extractedText = text;
+        const sections = parseSections(text);
+        parsedDocuments[fileId] = sections;
+        processingStatus[fileId] = 'Ready';
+        fileObj.status = 'Ready';
+        fileObj.processingMode = 'ocr';
+        fileObj.error = null;
+        onProgress(100);
+      } catch (err) {
+        console.error('OCR error for file', fileObj.name, err);
+        processingStatus[fileId] = 'Error';
+        fileObj.status = 'Error';
+        fileObj.processingMode = 'none';
+        fileObj.error = (err && err.message) ? err.message : 'OCR failed for this scanned insert.';
+        fileObj.progress = 100;
+        progressValues[fileId] = 100;
+      } finally {
+        renderFileCards();
+        const readyFiles = getReadyFiles();
+        if (readyFiles.length >= 2) {
+          compareSections(parsedDocuments);
+        }
         renderComparisonTable();
       }
+    }
 
-      // ------------------------------
-      // Export CSV
-      // ------------------------------
+    // ---------- Init ----------
+    function init() {
+      updateFileCountDisplay();
+      renderFileCards();
+      renderComparisonTable();
 
-      function exportComparisonCsv() {
-        if (!state.files.length || !state.comparison.length) return;
-        const headers = ['Section', ...state.files.map((f) => f.name)];
-        const rows = [headers];
-        for (const row of state.comparison) {
-          const line = [row.name];
-          for (const cell of row.cells) {
-            const txt = (cell.text || '').replace(/\r?\n+/g, ' ').replace(/"/g, '""').trim();
-            line.push(txt);
-          }
-          rows.push(line);
-        }
-        const csv = rows
-          .map((r) => r.map((v) => `"${v}"`).join(','))
-          .join('\r\n');
-        const blob = new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csv], {
-          type: 'text/csv;charset=utf-8;'
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'pi_comparison_v2_1.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
+      document.getElementById('clearAllBtn').addEventListener('click', clearAllFiles);
+      document.getElementById('exportCsvBtn').addEventListener('click', exportComparisonCsv);
+      document.getElementById('exportJsonBtn').addEventListener('click', exportComparisonJsonForAi);
+      document.getElementById('aiAssistBtn').addEventListener('click', showAiAssistPlaceholder);
 
-      // ------------------------------
-      // Event wiring – upload + process all + export
-      // ------------------------------
-
-      function attachCoreEventHandlers() {
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('fileInput');
-        const browseButton = document.getElementById('browseButton');
-        const clearAllButton = document.getElementById('clearAllButton');
-        const processAllButton = document.getElementById('processAllButton');
-        const exportCsvButton = document.getElementById('exportCsvButton');
-
-        if (!dropzone || !fileInput || !browseButton) return;
-
-        ['dragenter', 'dragover'].forEach((evtName) => {
-          dropzone.addEventListener(evtName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropzone.classList.add('highlight');
-          });
-        });
-
-        ['dragleave', 'drop'].forEach((evtName) => {
-          dropzone.addEventListener(evtName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropzone.classList.remove('highlight');
-          });
-        });
-
-        dropzone.addEventListener('drop', (e) => {
-          const dt = e.dataTransfer;
-          if (!dt) return;
-          addFiles(dt.files);
-        });
-
-        browseButton.addEventListener('click', () => {
-          fileInput.click();
-        });
-
-        fileInput.addEventListener('change', () => {
-          if (!fileInput.files) return;
-          addFiles(fileInput.files);
-          fileInput.value = '';
-        });
-
-        clearAllButton.addEventListener('click', () => {
-          clearAllFiles();
-        });
-
-        processAllButton.addEventListener('click', async () => {
-          if (!state.files.length) return;
-          processAllButton.disabled = true;
-          const originalLabel = processAllButton.textContent;
-          processAllButton.textContent = 'Processing…';
-
-          for (const doc of state.files) {
-            if (doc.status === 'parsed') continue;
-            doc.status = 'extracting';
-            render();
-
-            try {
-              const text = await extractTextForFile(doc);
-              doc.rawText = text;
-              doc.sections = parseSectionsFromText(text);
-              doc.status = 'parsed';
-            } catch (err) {
-              console.error('Failed to process document', err);
-              doc.status = 'error';
-              doc.error = String(err);
-            }
-
-            render();
-          }
-
-          processAllButton.disabled = false;
-          processAllButton.textContent = originalLabel;
-        });
-
-        exportCsvButton.addEventListener('click', () => {
-          exportComparisonCsv();
-        });
-      }
-
-      // ------------------------------
-      // AI assist stubs – connect to real models/APIs later
-      // ------------------------------
-
-      async function runLocalAiAssist(sectionName, textBundle) {
-        // Hook for local/browser model (e.g. WebLLM, local LLM).
-        // Replace this alert with real integration when ready.
-        alert(
-          'Local AI hook (stub) for section: ' +
-            sectionName +
-            '\n\nText (first 800 chars):\n\n' +
-            textBundle.slice(0, 800)
-        );
-      }
-
-      async function runRemoteAiAssist(sectionName, textBundle) {
-        // Hook for remote API model – replace URL and payload with your own.
-        // Example only (commented out):
-        //
-        // const response = await fetch('https://your-endpoint.example.com/pi-ai', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ section: sectionName, text: textBundle })
-        // });
-        // const data = await response.json();
-        // alert('API AI response:\\n\\n' + (data.summary || JSON.stringify(data, null, 2)));
-        //
-        alert(
-          'API AI hook (stub) for section: ' +
-            sectionName +
-            '\n\nText (first 800 chars):\n\n' +
-            textBundle.slice(0, 800)
-        );
-      }
-
-      function handleAiAssistClick(sectionId) {
-        const mode = state.settings.aiMode || 'none';
-        const row = state.comparison.find((r) => r.id === sectionId);
-        if (!row) return;
-
-        const texts = row.cells
-          .map((c, idx) => {
-            const name = state.files[idx] ? state.files[idx].name : `PI ${idx + 1}`;
-            return `${name}:\n${c.text || '[missing section]'}`;
-          })
-          .join('\n\n---\n\n');
-
-        if (mode === 'none') {
-          alert(
-            'AI mode is set to "No AI (rules only)".\n\n' +
-              'Open Settings → AI Mode and choose "Local AI" or "API AI" to enable assistance.'
-          );
-          return;
-        }
-
-        if (mode === 'local') {
-          runLocalAiAssist(row.name, texts);
-          return;
-        }
-
-        if (mode === 'api') {
-          runRemoteAiAssist(row.name, texts);
-          return;
-        }
-
-        alert('Unknown AI mode: ' + mode);
-      }
-
-      // ------------------------------
-      // Init – wire AI mode select as well
-      // ------------------------------
-
-      function attachAiModeHandler() {
-        const select = document.getElementById('aiModeSelect');
-        if (!select) return;
-        select.value = state.settings.aiMode || 'none';
-        select.addEventListener('change', () => {
-          const value = select.value || 'none';
-          state.settings.aiMode = value;
-        });
-      }
-
-      document.addEventListener('DOMContentLoaded', () => {
-        attachCoreEventHandlers();
-        attachAiModeHandler();
-        render();
+      const fileInput = document.getElementById('fileInput');
+      fileInput.addEventListener('change', e => {
+        addFiles(e.target.files);
+        fileInput.value = '';
       });
-    </script>
+
+      const dropzone = document.getElementById('dropzone');
+      ['dragenter', 'dragover'].forEach(evt =>
+        dropzone.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('dragover');
+        })
+      );
+      ['dragleave', 'drop'].forEach(evt =>
+        dropzone.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('dragover');
+        })
+      );
+      dropzone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files) {
+          addFiles(dt.files);
+        }
+      });
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      document.getElementById('tableContainer').classList.add('scrollbar');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
