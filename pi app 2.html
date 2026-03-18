@@ -1016,6 +1016,9 @@
       // ------------------------------
 
       async function extractTextFromPdf(file) {
+        if (!window.pdfjsLib) {
+          throw new Error('pdfjsLib not loaded');
+        }
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         let fullText = '';
