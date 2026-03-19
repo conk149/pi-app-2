@@ -630,22 +630,92 @@
 
     const NOT_SPECIFIED = 'Not specified in uploaded document';
 
-    const sectionConfigs = [
-      { key: 'indications', name: 'Indications', headerPatterns: [/indications?/i, /therapeutic indications?/i], synonyms: ['indication', 'indications', 'uses', 'usage'] },
-      { key: 'dilutionMethod', name: 'Dilution Method', headerPatterns: [/method of reconstitution/i, /reconstitution/i, /dilution/i, /preparation of the solution/i], synonyms: ['dilution', 'reconstitution', 'preparation'] },
-      { key: 'compatibleDiluents', name: 'Compatible Diluents', headerPatterns: [/compatible diluents?/i, /diluents? compatible/i], synonyms: ['diluent', 'diluents', 'solvent', 'solvents'] },
-      { key: 'administration', name: 'Administration', headerPatterns: [/method of administration/i, /administration/i, /posology and method of administration/i], synonyms: ['administration', 'administer', 'infusion', 'injection', 'posology'] },
-      { key: 'contraindications', name: 'Contraindications', headerPatterns: [/contraindications?/i], synonyms: ['contraindication', 'not to be used', 'must not be used'] },
-      { key: 'cautionsWarnings', name: 'Warnings / Precautions', headerPatterns: [/warnings? and precautions?/i, /special warnings and precautions for use/i], synonyms: ['warning', 'warnings', 'precaution', 'precautions'] },
-      { key: 'ageLimitsDosage', name: 'Dosage / Age Limits', headerPatterns: [/posology/i, /dosage and administration/i, /dose and administration/i, /paediatric population/i, /geriatric population/i], synonyms: ['dosage', 'dose', 'posology', 'age limits', 'pediatric', 'paediatric', 'elderly'] },
-      { key: 'drugInteractions', name: 'Drug Interactions', headerPatterns: [/drug interactions?/i, /interaction with other medicinal products/i], synonyms: ['interaction', 'drug interaction'] },
-      { key: 'sideEffects', name: 'Side Effects', headerPatterns: [/adverse reactions?/i, /undesirable effects?/i, /side effects?/i], synonyms: ['adverse reaction', 'adverse event', 'side effect'] },
-      { key: 'storage', name: 'Storage Conditions', headerPatterns: [/storage/i, /special precautions for storage/i], synonyms: ['store', 'storage'] },
-      { key: 'shelfLife', name: 'Shelf Life', headerPatterns: [/shelf life/i], synonyms: ['expiry', 'expiration'] },
-      { key: 'reconstitutionStability', name: 'Reconstitution / Infusion Stability', headerPatterns: [/stability/i, /shelf life after reconstitution/i], synonyms: ['stability', 'reconstituted solution'] },
-      { key: 'containerStrength', name: 'Container / Strength / Pack', headerPatterns: [/pharmaceutical form/i, /presentation/i, /pack size/i], synonyms: ['vial', 'ampoule', 'strength', 'pack'] },
-      { key: 'additionalNotes', name: 'Additional Notes', headerPatterns: [/special precautions for disposal/i, /other information/i], synonyms: ['note', 'miscellaneous'] }
-    ];
+const sectionConfigs = [
+  {
+    key: 'indications',
+    name: 'Indications',
+    headerPatterns: [/indications?/i, /therapeutic indications?/i],
+    synonyms: ['indication', 'indications', 'uses', 'usage']
+  },
+  {
+    key: 'dilutionMethod',
+    name: 'Dilution / Reconstitution',
+    headerPatterns: [/method of reconstitution/i, /reconstitution/i, /dilution/i, /preparation of the solution/i],
+    synonyms: ['dilution', 'reconstitution', 'preparation']
+  },
+  {
+    key: 'compatibleDiluents',
+    name: 'Compatible Diluents (NS, D5W, others)',
+    headerPatterns: [/compatible diluents?/i, /diluents? compatible/i],
+    synonyms: ['diluent', 'diluents', 'solvent', 'solvents']
+  },
+  {
+    key: 'administration',
+    name: 'Administration',
+    headerPatterns: [/method of administration/i, /administration/i, /posology and method of administration/i],
+    synonyms: ['administration', 'administer', 'infusion', 'injection', 'posology']
+  },
+  {
+    key: 'contraindications',
+    name: 'Contraindications',
+    headerPatterns: [/contraindications?/i],
+    synonyms: ['contraindication', 'not to be used', 'must not be used']
+  },
+  {
+    key: 'cautionsWarnings',
+    name: 'Warnings / Precautions',
+    headerPatterns: [/warnings? and precautions?/i, /special warnings and precautions for use/i],
+    synonyms: ['warning', 'warnings', 'precaution', 'precautions']
+  },
+  {
+    key: 'ageLimitsDosage',
+    name: 'Dosage / Age Limits',
+    headerPatterns: [/posology/i, /dosage and administration/i, /dose and administration/i, /paediatric population/i, /geriatric population/i],
+    synonyms: ['dosage', 'dose', 'posology', 'age limits', 'pediatric', 'paediatric', 'elderly']
+  },
+  {
+    key: 'drugInteractions',
+    name: 'Drug Interactions',
+    headerPatterns: [/drug interactions?/i, /interaction with other medicinal products/i],
+    synonyms: ['interaction', 'drug interaction']
+  },
+  {
+    key: 'sideEffects',
+    name: 'Side Effects / Adverse Reactions',
+    headerPatterns: [/adverse reactions?/i, /undesirable effects?/i, /side effects?/i],
+    synonyms: ['adverse reaction', 'adverse event', 'side effect']
+  },
+  {
+    key: 'storage',
+    name: 'Storage Conditions',
+    headerPatterns: [/storage/i, /special precautions for storage/i],
+    synonyms: ['store', 'storage']
+  },
+  {
+    key: 'shelfLife',
+    name: 'Shelf Life',
+    headerPatterns: [/shelf life/i],
+    synonyms: ['expiry', 'expiration']
+  },
+  {
+    key: 'reconstitutionStability',
+    name: 'Reconstitution / Infusion Stability',
+    headerPatterns: [/stability/i, /shelf life after reconstitution/i],
+    synonyms: ['stability', 'reconstituted solution']
+  },
+  {
+    key: 'containerStrength',
+    name: 'Container / Strength / Pack',
+    headerPatterns: [/pharmaceutical form/i, /presentation/i, /pack size/i],
+    synonyms: ['vial', 'ampoule', 'strength', 'pack']
+  },
+  {
+    key: 'additionalNotes',
+    name: 'Additional Notes',
+    headerPatterns: [/special precautions for disposal/i, /other information/i],
+    synonyms: ['note', 'miscellaneous']
+  }
+];
 
     function formatBytes(bytes) {
       if (!bytes || bytes === 0) return '0 B';
